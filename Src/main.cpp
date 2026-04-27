@@ -1,17 +1,19 @@
-#include "Inc/libs/my_stm32f4_gpio_lib.h"
+#include "Inc/libs/my_stm32f4_uart_lib.h"
 
 int main() {
-    GPIO_InitTypeDef GPIO_InitStruct = __GPIO_PIN_PARAMS(GPIO_PIN_5, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, 0x02U, 0x00U);
-
-    /* Test 1 */
-    Gpio myOutput_1(GPIOA_PORT, GPIOA, &GPIO_InitStruct);
-
-    Gpio myOutput_2(GPIOC_PORT, GPIOC, &GPIO_InitStruct);
+    UARTComm uart(TX_ONLY, _115200);
+    uart.LIB_UART_Init();
 
     while (1) {
-        myOutput_1.LIB_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-        myOutput_2.LIB_GPIO_TogglePin(GPIOC, GPIO_PIN_5);
-        for (volatile int i = 0; i < 100000; i++); /* Simple delay */
+        uart.LIB_UART_Write('H');
+        uart.LIB_UART_Write('e');
+        uart.LIB_UART_Write('l');
+        uart.LIB_UART_Write('l');
+        uart.LIB_UART_Write('o');
+        uart.LIB_UART_Write('\n');
+        for (volatile int i = 0; i < 1000000; ++i) {
+            // Simple delay loop
+        }
     }
 
     return 0;

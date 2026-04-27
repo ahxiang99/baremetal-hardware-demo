@@ -44,6 +44,7 @@ set(cpu_PARAMS
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_gpio_lib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_uart_lib.cpp
 )
 
 # Include directories for all compilers
