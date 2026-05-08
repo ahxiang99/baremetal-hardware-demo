@@ -74,9 +74,15 @@ char UARTComm::LIB_UART_Read() const {
     return USART2->DR;                 // Read the received data
 }
 
-void UARTComm::LIB_UART_Write(int ch) {
+void UARTComm::LIB_UART_WriteChar(int ch) {
     while (!(USART2->SR & (1 << 7)));  // Wait until TXE (Transmit Data Register Empty) is set
     USART2->DR = (ch & 0xFF);          // Write the character to the data register
+}
+
+void UARTComm::LIB_UART_Write(const char* string, uint16_t size) {
+    for (uint16_t i = 0; i < size; ++i) {
+        LIB_UART_WriteChar((int)string[i]);
+    }
 }
 
 UART_ComType UARTComm::LIB_UART_GetComType() const {

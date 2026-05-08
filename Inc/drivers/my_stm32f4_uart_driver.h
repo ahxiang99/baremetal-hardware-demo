@@ -3,11 +3,11 @@
 
 #include "Inc/drivers/my_stm32f4_gpio_driver.h"
 
-#define ABP1PERIPH_BASE (PERIPH_BASE + 0x00000000U)
-#define ABP2PERIPH_BASE (PERIPH_BASE + 0x00010000U)
-#define USART1_BASE (ABP2PERIPH_BASE + 0x1000U)
-#define USART6_BASE (ABP2PERIPH_BASE + 0x1400U)
-#define USART2_BASE (ABP1PERIPH_BASE + 0x4400U)
+#define APB1PERIPH_BASE (PERIPH_BASE + 0x00000000U)
+#define APB2PERIPH_BASE (PERIPH_BASE + 0x00010000U)
+#define USART1_BASE (APB2PERIPH_BASE + 0x1000U)
+#define USART6_BASE (APB2PERIPH_BASE + 0x1400U)
+#define USART2_BASE (APB1PERIPH_BASE + 0x4400U)
 
 typedef struct {
     __IO uint32_t SR;   /*!< USART Status register,                   Address offset: 0x00 */

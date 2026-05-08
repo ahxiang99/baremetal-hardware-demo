@@ -9,7 +9,7 @@
 
 class MySysTick {
    private:
-    constexpr static uint32_t SYSTICK_CLK_FREQ = 16000000;  // Assuming 16 MHz clock
+    constexpr static uint32_t SYSTICK_CLK_FREQ = 1600;  // Assuming 16 MHz clock
     uint32_t                  tickCount;
 
    public:

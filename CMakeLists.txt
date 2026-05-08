@@ -35,6 +35,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Core MCU flags, CPU type, instruction set and FPU setup
 set(cpu_PARAMS 
+    -mcpu=cortex-m4
+    -mthumb
+    -mfpu=fpv4-sp-d16
+    -mfloat-abi=hard    
     # Other parameters
     # -mthumb
     # -mcpu, -mfloat, -mfloat-abi, ...
@@ -46,6 +50,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_gpio_lib.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_uart_lib.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_systick_lib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_i2c_lib.cpp
 )
 
 # Include directories for all compilers

@@ -17,7 +17,8 @@ class UARTComm {
     UARTComm(UART_ComType _comType, UART_BaudRateType _baudRate);
     void              LIB_UART_Init();
     char              LIB_UART_Read() const;
-    void              LIB_UART_Write(int ch);
+    void              LIB_UART_WriteChar(int ch);
+    void              LIB_UART_Write(const char* string, uint16_t size);
     UART_ComType      LIB_UART_GetComType() const;
     UART_BaudRateType LIB_UART_GetBaudRate() const;
 };
