@@ -1,10 +1,14 @@
-#ifndef __MY_STM32F4_UART_DRIVER_H__
-#define __MY_STM32F4_UART_DRIVER_H__
+#ifndef UART_REGISTERS_H
+#define UART_REGISTERS_H
 
-#include "Inc/drivers/my_stm32f4_gpio_driver.h"
+// @ Purpose : Register layouts
 
-#define APB1PERIPH_BASE (PERIPH_BASE + 0x00000000U)
-#define APB2PERIPH_BASE (PERIPH_BASE + 0x00010000U)
+#include <stdint.h>
+
+#include "low-level/rcc_registers.h"
+
+#define __IO volatile
+
 #define USART1_BASE (APB2PERIPH_BASE + 0x1000U)
 #define USART6_BASE (APB2PERIPH_BASE + 0x1400U)
 #define USART2_BASE (APB1PERIPH_BASE + 0x4400U)
@@ -19,8 +23,4 @@ typedef struct {
     __IO uint32_t GTPR; /*!< USART Guard time and prescaler register, Address offset: 0x18 */
 } USART_TypeDef;
 
-#define USART1 ((USART_TypeDef*)USART1_BASE)
-#define USART2 ((USART_TypeDef*)USART2_BASE)
-#define USART6 ((USART_TypeDef*)USART6_BASE)
-
-#endif /* __MY_STM32F4_UART_DRIVER_H__ */
+#endif

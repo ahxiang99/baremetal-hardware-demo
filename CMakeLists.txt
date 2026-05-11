@@ -47,17 +47,32 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_gpio_lib.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_uart_lib.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_systick_lib.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_stm32f4_i2c_lib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/gpio.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/low-level/gpio.c
+
+    
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/uart.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/low-level/uart.c
+    
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/i2c.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/low-level/i2c.c
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/TempSensor.cpp
+    
 )
 
 # Include directories for all compilers
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/drivers
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/libs
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
 )
 
 # Include directories for each compiler

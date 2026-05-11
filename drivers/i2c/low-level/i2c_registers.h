@@ -1,12 +1,17 @@
-#ifndef __MY_STM32F4_I2C_DRIVER_H__
-#define __MY_STM32F4_I2C_DRIVER_H__
+#ifndef I2C_REGISTERS_H
+#define I2C_REGISTERS_H
 
-#include "Inc/drivers/my_stm32f4_uart_driver.h"
+#include "low-level/rcc_registers.h"
 
-#define __IO volatile
 #define I2C1_BASE (APB1PERIPH_BASE + 0x5400U)
 #define I2C2_BASE (APB1PERIPH_BASE + 0x5800U)
 #define I2C3_BASE (APB1PERIPH_BASE + 0x5C00U)
+
+#define I2C1 ((I2C_TypeDef*)I2C1_BASE)
+#define I2C2 ((I2C_TypeDef*)I2C2_BASE)
+#define I2C3 ((I2C_TypeDef*)I2C3_BASE)
+
+#define __IO volatile
 
 typedef struct {
     __IO uint32_t CR1;   /* I2C Control Register 1, Address Offset: 0x00 */
@@ -20,9 +25,5 @@ typedef struct {
     __IO uint32_t TRISE; /* I2C Maximum Time Rise in Fm / Sm Mode (Controller Mode), Address Offset: 0x20 */
     __IO uint32_t FLTR;  /* I2C Noise Filter, Address Offset: 0x24 */
 } I2C_TypeDef;
-
-#define I2C1 ((I2C_TypeDef*)I2C1_BASE)
-#define I2C2 ((I2C_TypeDef*)I2C2_BASE)
-#define I2C3 ((I2C_TypeDef*)I2C3_BASE)
 
 #endif

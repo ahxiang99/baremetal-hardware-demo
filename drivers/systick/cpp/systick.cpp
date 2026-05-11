@@ -1,6 +1,4 @@
-#include "Inc/libs/my_stm32f4_systick_lib.h"
-
-#include "my_stm32f4_systick_driver.h"
+#include "systick.hpp"
 
 MySysTick::MySysTick(uint32_t _seconds) {
     LIB_SET_TICKCOUNT(_seconds);
