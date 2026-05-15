@@ -7,6 +7,8 @@
 #include "low-level/i2c_types.h"
 #include "low-level/rcc.h"
 
+i2c_device::i2c_device() : m_pInstance(nullptr), m_pConfig(nullptr), m_Init(false) {}
+
 i2c_device::i2c_device(I2C_InitTypeDef* p_Config) : m_pInstance(I2C_GetBaseAddress(p_Config->i2cx)), m_pConfig(p_Config) {
     if (I2C_HardwareInit(p_Config) != I2C_OK) {
         m_Init = false;

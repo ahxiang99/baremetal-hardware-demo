@@ -27,12 +27,13 @@ class i2c_device : public II2CMaster {
     bool             m_Init;
 
    public:
+    i2c_device();
     i2c_device(I2C_InitTypeDef* pConfig);
     I2C_Status Write(uint8_t target_addr, const uint8_t* pData, uint16_t size) override;
     I2C_Status Read(uint8_t target_addr, uint8_t* pBuffer, uint16_t size) override;
     bool       isReady() const override;
-    I2C_State  GetState() const;
-    void       SetState(I2C_State pState);
+    I2C_State  GetState() const override;
+    void       SetState(I2C_State pState) override;
 };
 
 #endif

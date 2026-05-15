@@ -1,5 +1,5 @@
-#ifndef __MY_STM32F4_SYSTICK_DRIVER_H__
-#define __MY_STM32F4_SYSTICK_DRIVER_H__
+#ifndef SYSTICK_H
+#define SYSTICK_H
 
 #include <stdint.h>
 
@@ -20,4 +20,4 @@ typedef struct {
 
 #define SysTick ((SysTick_TypeDef*)SYSTICK_BASE)
 
-#endif /* __MY_STM32F4_SYSTICK_DRIVER_H__ */
+#endif /* SYSTICK_H */

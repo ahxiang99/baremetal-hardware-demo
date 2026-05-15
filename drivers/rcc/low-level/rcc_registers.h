@@ -1,14 +1,15 @@
 #ifndef RCC_REGISTERS_H
 #define RCC_REGISTERS_H
 
-#include "rcc.h"
+#define __IO volatile
+#include <stdint.h>
 
 #define PERIPH_BASE 0X40000000U
 #define AHB1PERIPH_BASE (PERIPH_BASE + 0x00020000U)
 #define APB1PERIPH_BASE (PERIPH_BASE + 0x00000000U)
 #define APB2PERIPH_BASE (PERIPH_BASE + 0x00010000U)
 #define RCC_BASE (AHB1PERIPH_BASE + 0x3800U)
-#define RCC ((RCC_TypeDef*)RCC_BASE)
+#define RCC ((RCC_TypeDef*)(RCC_BASE))
 
 typedef struct {
     __IO uint32_t CR;           /*!< RCC clock control register,             Address offset: 0x00 */

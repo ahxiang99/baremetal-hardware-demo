@@ -6,7 +6,4 @@
 #include "rcc_bitfields.h"
 #include "rcc_registers.h"
 
-
-#define __IO volatile
-
 #endif

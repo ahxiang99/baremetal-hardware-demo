@@ -10,7 +10,7 @@
 #define GPIOHEN (1 << 7)
 
 /* GPIO PIN Definition */
-#define GPIO_PIN_O ((uint16_t)0x0001)   /* Pin 0 selected    */
+#define GPIO_PIN_0 ((uint16_t)0x0001)   /* Pin 0 selected    */
 #define GPIO_PIN_1 ((uint16_t)0x0002)   /* Pin 1 selected    */
 #define GPIO_PIN_2 ((uint16_t)0x0004)   /* Pin 2 selected    */
 #define GPIO_PIN_3 ((uint16_t)0x0008)   /* Pin 3 selected    */
@@ -27,7 +27,7 @@
 #define GPIO_PIN_14 ((uint16_t)0x4000)  /* Pin 14 selected   */
 #define GPIO_PIN_15 ((uint16_t)0x8000)  /* Pin 15 selected   */
 #define GPIO_PIN_ALL ((uint16_t)0xFFFF) /* All pins selected */
-#define GPIO_NUMBER 16U
+#define GPIO_PIN_COUNT 16U
 
 /* */
 #define GPIO_MODER_MODE0 (0x03U << 0)

@@ -1,6 +1,6 @@
 #include "uart.hpp"
 
-#include "cpp/gpio.hpp"
+#include "drivers/gpio/cpp/gpio.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
 #include "low-level/uart.h"

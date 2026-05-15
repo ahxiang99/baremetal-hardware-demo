@@ -1,18 +1,36 @@
 #include "systick.hpp"
 
-MySysTick::MySysTick(uint32_t _seconds) {
-    LIB_SET_TICKCOUNT(_seconds);
+#include <cstdint>
 
-    SysTick->LOAD = tickCount - 1;  // Set reload register
-    SysTick->VAL  = 0;              // Clear current value register
-    SysTick->CTRL = 0x05U;          // Enable SysTick, use processor clock, no interrupt
+#include "low-level/nvic.h"
 
-    while (!(SysTick->CTRL & 0x10000)) {
-        // Wait until the COUNTFLAG is set
-    }
+MySysTick::MySysTick() {}
+
+void MySysTick::init() {
+    // Construct 1ms heartbeat
+    SysTick->LOAD = 16000 - 1;  // Set reload register
+    SysTick->VAL  = 0;          // Clear current value register
+    SysTick->CTRL = 0x07U;      // Enable SysTick, use processor clock, no interrupt
+    My_NVIC_EnableIRQ(15);
+}
+
+MySysTick::~MySysTick() {
     SysTick->CTRL = 0x00U;  // Disable SysTick
 }
 
-void MySysTick::LIB_SET_TICKCOUNT(uint32_t seconds) {
-    tickCount = seconds * SYSTICK_CLK_FREQ;
+uint32_t MySysTick::get_ticks() const {
+    return tickCount;
+}
+
+void MySysTick::tick() {
+    tickCount++;
+}
+
+void MySysTick::delay_ms(uint32_t ms) const {
+    uint32_t _start = tickCount;
+    while ((tickCount - _start) < ms);
+}
+
+extern "C" void SysTick_Handler() {
+    timer.tick();
 }

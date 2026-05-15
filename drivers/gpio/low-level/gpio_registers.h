@@ -8,6 +8,8 @@
 #define GPIOE_BASE (AHB1PERIPH_BASE + 0x1000U)
 #define GPIOH_BASE (AHB1PERIPH_BASE + 0x1C00U)
 
+#include <stdint.h>
+
 #define __IO volatile
 
 typedef struct {
@@ -19,7 +21,7 @@ typedef struct {
     __IO uint32_t ODR;     /*!< GPIO port output data register,        Address offset: 0x14      */
     __IO uint32_t BSRR;    /*!< GPIO port bit set/reset register,      Address offset: 0x18      */
     __IO uint32_t LCKR;    /*!< GPIO port configuration lock register, Address offset: 0x1C      */
-    __IO uint32_t AFR[2];  /*!< GPIO alternate function registers,      Address offset: 0x20-0x24 */
+    __IO uint32_t AFR[2];  /*!< GPIO altern ate function registers,      Address offset: 0x20-0x24 */
 } GPIO_TypeDef;
 
 /* GPIOx Base Address*/

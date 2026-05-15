@@ -2,48 +2,50 @@
 
 #include <cstddef>
 
-#include "low-level/gpio_types.h"
-
 GPIO::GPIO(GPIO_InitTypeDef* p_Config) : m_pInstance{nullptr}, m_pConfig{p_Config}, m_Init{false} {
-    if (InitDriver(m_pConfig) == GPIO_OK) {
+    if (InitDriver(m_pConfig) == STATUS_OK) {
         m_Init = true;
     }
 }
+GPIO::GPIO() : m_pInstance{nullptr}, m_pConfig{nullptr}, m_Init{false} {}
 
-GPIO_STATUS GPIO::InitDriver(GPIO_InitTypeDef* const p_Config) {
-    if (m_pConfig == nullptr) {
-        return GPIO_ERR;
+Result GPIO::InitDriver(GPIO_InitTypeDef* const p_Config) {
+    if (p_Config == nullptr) {
+        return ERR_NULLPTR;
     } else {
         if (!m_Init) {
-            m_pConfig   = p_Config;
-            m_pInstance = GPIO_HardwareInit(m_pConfig->PORT);
-            if (GPIO_PinSetConfig(m_pInstance, m_pConfig) == GPIO_ERR) {
+            m_pConfig = p_Config;
+            if ((GPIO_HardwareInit(m_pConfig->PORT, &m_pInstance) == STATUS_OK)) {
+                if (GPIO_PinSetConfig(m_pInstance, m_pConfig) == STATUS_OK) {
+                    m_Init = true;
+                }
+            } else {
                 m_Init = false;
-                return GPIO_ERR;
+                return ERR_INIT;
             }
         }
-        return GPIO_OK;
+        return STATUS_OK;
     }
 }
 
-GPIO_STATUS GPIO::ResetDriver() {
+Result GPIO::ResetDriver() {
     m_Init = false;
     return GPIO_HardwareReset(m_pConfig->PORT);
 }
 
-GPIO_STATUS GPIO::SetPinConfig(GPIO_Config* p_Config) {
-    if (p_Config == nullptr) return GPIO_ERR;
+Result GPIO::SetPinConfig(GPIO_Config* p_Config) {
+    if (p_Config == nullptr) return ERR_NULLPTR;
 
     if (m_Init) {
-        if (GPIO_GetBaseAddress(p_Config->PORT) != m_pInstance) return GPIO_ERR;
+        // if (GPIO_HardwareInit(p_Config->PORT) != m_pInstance) return GPIO_ERR;
         return GPIO_PinSetConfig(m_pInstance, p_Config);
     } else {
         return InitDriver(p_Config);
     }
 }
 
-GPIO_STATUS GPIO::TogglePin(const uint16_t PIN) {
-    if (!m_Init) return GPIO_ERR;
+Result GPIO::TogglePin(const uint16_t PIN) {
+    if (!m_Init) return ERR_NULLPTR;
     return GPIO_ToggleOutputPin(m_pInstance, PIN);
 }
 

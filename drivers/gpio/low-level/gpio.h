@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <assert.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "gpio_bitfields.h"
@@ -12,16 +14,15 @@ extern "C" {
 #include "gpio_types.h"
 
 /* Driver Prototypes */
-GPIO_TypeDef* GPIO_HardwareInit(gpio_port_t _port);
-GPIO_TypeDef* GPIO_GetBaseAddress(gpio_port_t _port);
-gpio_status_t GPIO_HardwareReset(gpio_port_t _port);
-gpio_status_t GPIO_PinSetConfig(GPIO_TypeDef* GPIOx, const GPIO_InitTypeDef* IO_cfg);
-gpio_status_t GPIO_WriteOutputPin(GPIO_TypeDef* GPIOx, const uint16_t PIN, const gpio_pin_state_t state);
-gpio_status_t GPIO_ReadInputPin(GPIO_TypeDef* GPIOx, const uint16_t GPIO_PIN, gpio_pin_state_t* state);
-gpio_status_t GPIO_ToggleOutputPin(GPIO_TypeDef* GPIOx, const uint16_t GPIO_PIN);
+status_t GPIO_HardwareInit(gpio_port_t port, GPIO_TypeDef** p_Instance);
+status_t GPIO_HardwareReset(gpio_port_t port);
+status_t GPIO_PinSetConfig(GPIO_TypeDef* p_Instance, const GPIO_InitTypeDef* p_Config);
+status_t GPIO_WriteOutputPin(GPIO_TypeDef* p_Instance, const uint16_t PIN, const gpio_pin_state_t state);
+status_t GPIO_ReadInputPin(GPIO_TypeDef* p_Instance, const uint16_t GPIO_PIN, gpio_pin_state_t* state);
+status_t GPIO_ToggleOutputPin(GPIO_TypeDef* p_Instance, const uint16_t GPIO_PIN);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __MY_STM32F4_GPIO_DRIVER_H */
+#endif

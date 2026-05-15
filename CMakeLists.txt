@@ -57,6 +57,8 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/i2c.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/low-level/i2c.c
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/low-level/tim.c
+
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/TempSensor.cpp
@@ -70,6 +72,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
@@ -79,6 +82,7 @@ set(include_DIRS
 set(include_c_DIRS)
 set(include_cxx_DIRS)
 set(include_asm_DIRS)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Symbols definition for all compilers
 set(symbols_SYMB)
