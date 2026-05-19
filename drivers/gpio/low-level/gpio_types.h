@@ -38,9 +38,6 @@ typedef enum { GPIO_PUPDR_NOPULL = 0, GPIO_PUPDR_PULLUP, GPIO_PUPDR_PULLDOWN } g
 /* Pin State */
 typedef enum { GPIO_PIN_RESET = 0, GPIO_PIN_SET } gpio_pin_state_t;
 
-/* Error State */
-typedef enum { STATUS_OK = 0, ERR_INVALID_ARG, ERR_NULLPTR, ERR_INIT } status_t;
-
 typedef struct {
     gpio_port_t    PORT;      /* Specifies the GPIO PORT to be configured. */
     uint32_t       PIN;       /* Specifies the GPIO pins to be configured. */

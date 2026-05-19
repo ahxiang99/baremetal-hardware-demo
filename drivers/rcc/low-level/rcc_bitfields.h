@@ -73,4 +73,22 @@
 #define RCC_APB2ENR_TIM10_EN (1 << 17)
 #define RCC_APB2ENR_TIM11_EN (1 << 18)
 
+#define RCC_CR_HSION (1 << 0)
+#define RCC_CR_HSIRDY (1 << 1)
+#define RCC_CR_HSITRIM (1 << 3)
+#define RCC_CR_HSICAL (1 << 8)
+#define RCC_CR_HSEON (1 << 16)
+#define RCC_CR_HSERDY (1 << 17)
+#define RCC_CR_HSEBYP (1 << 18)
+#define RCC_CR_CSSON (1 << 19)
+#define RCC_CR_PLLON (1 << 24)
+#define RCC_CR_PLLRDY (1 << 25)
+#define RCC_CR_PLLI2SON (1 << 24)
+#define RCC_CR_PLLI2SRDY (1 << 24)
+
+#define RCC_CFGR_PLLM_Pos (0)
+#define RCC_CFGR_PLLN_Pos (6)
+#define RCC_CFGR_PLLP_Pos (16)
+#define RCC_CFGR_PLLQ_Pos (24)
+
 #endif

@@ -57,11 +57,16 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/i2c.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/low-level/i2c.c
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
+
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/low-level/tim.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/TempSensor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG/cpp/usbotg.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
     
 )
 
@@ -76,6 +81,8 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/logger
 )
 
 # Include directories for each compiler
@@ -153,6 +160,10 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
     -Wextra
     -Wpedantic
     -Wno-unused-parameter
+
+    -ffunction-sections
+    -fdata-sections
+
     $<$<COMPILE_LANGUAGE:C>: >
     $<$<COMPILE_LANGUAGE:CXX>:
 
@@ -182,6 +193,8 @@ target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
     -Wl,--end-group
     -Wl,-z,max-page-size=8 # Allow good software remapping across address space (with proper GCC section making)
     -Wl,--print-memory-usage
+
+    -Wl,--gc-sections
 )
 
 # Conditionally add CMSE linker options

@@ -93,43 +93,46 @@ void I2C1_EV_IRQHandler(void) {
         return;
     }
     // ADDR Flag: Address sent and ACK received
-    if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_ADDR)) {
+    else if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_ADDR)) {
         if (hI2C1.State == I2C_BUSY_RX && hI2C1.Count == 1) {
             CLEAR_BIT(hI2C1.pInstance->CR1, I2C_CR1_ACK);
         }
         // Clear ADDR Bit
-        uint32_t temp = hI2C1.pInstance->SR1;
+        volatile uint32_t temp = hI2C1.pInstance->SR1;
         temp          = hI2C1.pInstance->SR2;
         (void)temp;
 
         if (hI2C1.State == I2C_BUSY_RX && hI2C1.Count == 1) {
             SET_BIT(hI2C1.pInstance->CR1, I2C_CR1_STOP);
         }
-    }
+        return;
+    }  
     // TXE Flag: Data register empty, ready for next byte
-    if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_TXE) && !(READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_BTF)) && (hI2C1.State == I2C_BUSY_TX)) {
+    else if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_TXE) && !(READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_BTF)) && (hI2C1.State == I2C_BUSY_TX)) {
         if (hI2C1.Count > 0) {
             hI2C1.pInstance->DR = *hI2C1.pBuffer++;
             hI2C1.Count--;
         }
+        return;
     }
     // RNXE Flag: Data register is full, receive the byte
-    if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_RXNE)) {
+    else if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_RXNE)) {
         if (hI2C1.Count > 1) {
             if (hI2C1.Count == 2) {
-                SET_BIT(hI2C1.pInstance->CR1, I2C_CR1_ACK);
+                CLEAR_BIT(hI2C1.pInstance->CR1, I2C_CR1_ACK);
                 SET_BIT(hI2C1.pInstance->CR1, I2C_CR1_STOP);
             }
-            *hI2C1.pBuffer++ = I2C1->DR;
+            *hI2C1.pBuffer++ = hI2C1.pInstance->DR;
             hI2C1.Count--;
         } else {
-            *hI2C1.pBuffer++ = I2C1->DR;
+            *hI2C1.pBuffer++ = hI2C1.pInstance->DR;
             hI2C1.State      = I2C_READY;
             CLEAR_BIT(hI2C1.pInstance->CR2, I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
         }
+        return;
     }
     // Wait for BTF (Byte Transfer Finished) to ensure last byte is gone
-    if (READ_BIT(I2C1->SR1, I2C_SR1_BTF)) {
+    else if (READ_BIT(I2C1->SR1, I2C_SR1_BTF)) {
         if (hI2C1.State == I2C_BUSY_TX) {
             if (hI2C1.Count == 0) {
                 // No more data, send STOP and wrap up
@@ -138,6 +141,7 @@ void I2C1_EV_IRQHandler(void) {
                 hI2C1.State = I2C_READY;
             }
         }
+        return;
     }
 }
 
@@ -215,8 +219,8 @@ I2C_Status I2C_ReceiveByte(I2C_TypeDef* pInstance, uint8_t target_addr, uint8_t*
     hI2C1.State     = I2C_BUSY_RX;
 
     // 1. Generate START Condition
-    SET_BIT(pInstance->CR1, I2C_CR1_START);
     SET_BIT(pInstance->CR1, I2C_CR1_ACK);
+    SET_BIT(pInstance->CR1, I2C_CR1_START);
 
     // 2. Enable Interrupt
     SET_BIT(pInstance->CR2, I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);

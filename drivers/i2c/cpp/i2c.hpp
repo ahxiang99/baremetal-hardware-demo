@@ -29,6 +29,8 @@ class i2c_device : public II2CMaster {
    public:
     i2c_device();
     i2c_device(I2C_InitTypeDef* pConfig);
+    bool       InitDriver(I2C_InitTypeDef* pConfig);
+
     I2C_Status Write(uint8_t target_addr, const uint8_t* pData, uint16_t size) override;
     I2C_Status Read(uint8_t target_addr, uint8_t* pBuffer, uint16_t size) override;
     bool       isReady() const override;

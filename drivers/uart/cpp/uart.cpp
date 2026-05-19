@@ -6,16 +6,43 @@
 #include "low-level/uart.h"
 #include "low-level/uart_types.h"
 
+/**
+ * @brief Initialize the UART Device
+ *
+ * This function processes init the USART driver.
+ *
+ *
+ * @param p_Config A pointer to the UART Config.
+ * @return An object of UART Driver.
+ */
 UARTDevice::UARTDevice(USART_InitTypeDef* p_Config) : m_pInstance(USART_GetBaseAddress(p_Config->device)), m_pConfig(p_Config), m_Init(false), m_LineIdx(0) {
     if (m_pInstance == nullptr || m_pConfig == nullptr) return;
+    m_Init = InitDriver(m_pConfig);
+}
+UARTDevice::UARTDevice() : m_pInstance(nullptr), m_pConfig(nullptr), m_Init(false), m_LineIdx(0) {}
 
-    if (SetupPin() != USART_OK) return;
-
-    if (Init_Device() != USART_OK) return;
-
-    m_Init = true;
+bool UARTDevice::InitDriver(USART_InitTypeDef* p_Config) {
+    if (p_Config == nullptr) return false;
+    m_pConfig   = p_Config;
+    m_pInstance = USART_GetBaseAddress(m_pConfig->device);
+    if (SetupPin() == USART_OK && Init_Device() == USART_OK) {
+        m_Init = true;
+        return true;
+    } else {
+        m_Init = false;
+        return false;
+    }
 }
 
+/**
+ * @brief Initialize the UART Pin
+ *
+ * This function init the UART TX and RX PIN
+ *
+ *
+ * @param
+ * @return Status OK if success, else failed.
+ */
 USART_Status UARTDevice::SetupPin() {
     // 1. Initialize the GPIO Pin for respective USARTx.
     GPIO_InitTypeDef gpio_cfg;

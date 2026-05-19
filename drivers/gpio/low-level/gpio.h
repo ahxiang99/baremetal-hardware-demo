@@ -12,6 +12,7 @@ extern "C" {
 #include "gpio_bitfields.h"
 #include "gpio_registers.h"
 #include "gpio_types.h"
+#include "status.h"
 
 /* Driver Prototypes */
 status_t GPIO_HardwareInit(gpio_port_t port, GPIO_TypeDef** p_Instance);

@@ -16,13 +16,15 @@ class UARTDevice {
     USART_Status       Init_Device();
 
    public:
+    UARTDevice();
     UARTDevice(USART_InitTypeDef* cfg);
+    bool InitDriver(USART_InitTypeDef* cfg);
 
     /* USART Data Transmission Function */
     USART_Status DataAvailable();
-    bool         HandleInput();
+    bool         HandleInput();  // For Command Line Input...
 
-    USART_Status Print(const char* buffer, uint16_t size);
+    USART_Status Print(const char* buffer, uint16_t size);  // Print to Console
     USART_Status Get(char* c);
 
     const char*  GetLine();
