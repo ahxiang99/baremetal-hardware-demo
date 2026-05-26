@@ -21,7 +21,7 @@
 #
 
 # Core project settings
-project("GPIO_Driver")
+project("baremetal-hardware-demo")
 enable_language(C CXX ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
@@ -49,8 +49,7 @@ set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/gpio.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/low-level/gpio.c
-
-    
+ 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/uart.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/low-level/uart.c
     
@@ -63,11 +62,8 @@ set(sources_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG/cpp/usbotg.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
-    
 )
 
 # Include directories for all compilers
@@ -81,7 +77,6 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
 )
 
