@@ -1,28 +1,44 @@
 #pragma once
+
+#include <array>
 #include <cmath>
 #include <cstdint>
+
 #include "Sensor.hpp"
 
 class II2CMaster;
 
 class SHT4X : public Sensor {
    private:
-    uint32_t    m_LastCallTick;
-    float_t     m_Temp;
-    float_t     m_Rh;
-    uint8_t     data[6];
+    // Hardware Address
+    II2CMaster* m_Bus;
+    uint8_t     m_DevAddr;
 
-   public:
-    SHT4X();
-    float_t     PollingData(); // Polling Method.
+    // Last record of tick for delay
+    uint32_t m_LastCallTick;
 
-    float_t getTemp() const;
+    // Data Variables
+    std::array<uint8_t, 6> raw_data;
+    float_t                m_Temp;
+    float_t                m_Rh;
+
+    // Data Manipulation
+    void ProcessData();
+    void ClearData();
     void SetTemp(float_t temp);
-
-    float_t getRh() const;
     void SetRh(float_t rh);
 
-    void        Init(II2CMaster* p_Bus, uint8_t addr) override;
-    void        StartConversation() override;
-    void        Process() override;
+   public:
+    // Init the hardware Sensor
+    SHT4X();
+    SHT4X(II2CMaster& pBus, uint8_t dev_addr, const char* name);
+
+    // Data Getter
+    float_t getTemp() const;
+    float_t getRh() const;
+
+    // Sensor Interface
+    void Init(II2CMaster& pBus, uint8_t dev_addr, const char* name);
+    void StartRead() override;
+    void StartRead_IT() override;
 };

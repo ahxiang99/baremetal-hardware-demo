@@ -65,8 +65,6 @@ set(sources_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG/cpp/usbotg.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/low-level/DMA.c
-
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
     
@@ -84,7 +82,6 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
 )
 
@@ -196,7 +193,6 @@ target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
     -Wl,--end-group
     -Wl,-z,max-page-size=8 # Allow good software remapping across address space (with proper GCC section making)
     -Wl,--print-memory-usage
-
     -Wl,--gc-sections
 )
 

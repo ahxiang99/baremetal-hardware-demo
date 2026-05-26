@@ -8,8 +8,9 @@
 #include <iterator>
 #include <string_view>
 
-#include "Middleware/logger/logger.hpp"
+#include "Middleware/logger.hpp"
 #include "SHT4X.hpp"
+#include "Sensor.hpp"
 #include "bit_utils.h"
 #include "drivers/gpio/cpp/gpio.hpp"
 #include "drivers/i2c/cpp/i2c.hpp"
@@ -38,12 +39,13 @@ MySysTick     timer;
 GPIO          GPIO_CTL_A;
 GPIO          GPIO_CTL_B;
 UARTDevice    UART2;
-i2c_device    p_hI2C1;
+i2c_device    hi2c1;
+SHT4X         Sensor_t;
 
 void          Init_All_Driver() {
     Logger::set_level(LogLevel::DBG);
 
-    USART_InitTypeDef uart_cfg{USART_D2, RX_TX, _9600, USART_CR1_RXNEIE};
+    USART_InitTypeDef uart_cfg{USART_D2, RX_TX, _9600};
     UART2.InitDriver(&uart_cfg);
     LOG_DEBUG("Booting...");
     LOG_DEBUG("USART2 Initialized");
@@ -53,7 +55,7 @@ void          Init_All_Driver() {
     LOG_DEBUG("GPIOB Initialized");
 
     I2C_InitTypeDef i2c1_Config{I2C_1, I2C_SPEED_STANDARD, 0, 0, 0, 0};
-    p_hI2C1.InitDriver(&i2c1_Config);
+    hi2c1.InitDriver(&i2c1_Config);
     LOG_DEBUG("I2C1 Initialized");
 
     // To Blink LED
@@ -80,19 +82,21 @@ int main() {
     TIM_TypeDef*    Timer = TIM3;
 
     TIM_Init(Timer, &Tim_Config);
-    SHT4X Sensor_t;
-    Sensor_t.Init(&p_hI2C1, 0x88);
+
+    Sensor_t.Init(hi2c1, 0x88, "SHT40AD1B");
 
     while (1) {
         if (trigger_measurement) {
-            Sensor_t.StartConversation();
+            Sensor_t.SetState(SensorState::MEASURING);
+            Sensor_t.StartRead_IT();
             trigger_measurement = false;
         }
 
         timer.delay_ms(10);
-        Sensor_t.Process();
+        Sensor_t.StartRead_IT();
+        // Read and Print Data to Console
         float_t temp = Sensor_t.getTemp();
-        float_t rh = Sensor_t.getRh();
+        float_t rh   = Sensor_t.getRh();
         if (temp != 0.0f && trigger_measurement) {
             FloatIntExtraction result_temp = convertInt(temp);
             LOG_INFO("Temp Reading: {}.{}", result_temp.Integer, result_temp.Decimal);
