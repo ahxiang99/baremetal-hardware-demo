@@ -23,7 +23,7 @@ This project demonstrates professional embedded systems development practices wi
 ## Project Structure
 
 ```
-GPIO_Driver_cpp/
+baremetal-hardware-demo/
 ├── CMakeLists.txt              # CMake build configuration
 ├── CMakePresets.json           # CMake presets for VS Code
 ├── stm32f401xe_flash.ld        # Linker script for STM32F401XE
