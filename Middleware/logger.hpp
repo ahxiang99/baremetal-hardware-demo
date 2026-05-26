@@ -1,12 +1,15 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string_view>
 
+#include "../Middleware/RingBuffer.hpp"
+#include "RingBuffer.hpp"
 #include "cpp/uart.hpp"
 
 #ifdef NDEBUG
@@ -49,8 +52,34 @@ class Logger {
         print_transport("\r\n");
     }
 
+    static void Logging() {
+        if (dma_busy) return;
+
+        if (ring_buf.empty()) return;
+
+        uint8_t transfer_size = ring_buf.size();
+        if (transfer_size > BUF_SIZE) {
+            transfer_size = BUF_SIZE;
+        }
+
+        for (size_t i = 0; i < transfer_size; ++i) {
+            auto temp = ring_buf.pop();
+            if (temp.has_value()) {
+                tx_dma_buffer_A.at(i) = temp.value();
+            }
+        }
+        tx_dma_buffer_B.swap(tx_dma_buffer_A);
+
+        tx_dma_buffer_A.fill(0);
+    }
+
    private:
-    static LogLevel& get_current_level() {
+    static uint8_t                      dma_busy;
+    static inline std::array<char, 128> tx_dma_buffer_A;
+    static inline std::array<char, 128> tx_dma_buffer_B;
+    static inline RingBuffer<char>      ring_buf;
+
+    static LogLevel&                    get_current_level() {
         static LogLevel current_level = LogLevel::INFO;
         return current_level;
     }
@@ -126,6 +155,27 @@ class Logger {
     static void print_transport(std::string_view str) {
         UART2.Print(str.data(), str.size());
     }
+
+    // static void print_transport(const char* str) {
+    //     print_transport_helper(str);
+    // }
+
+    // static void print_transport(std::string_view str) {
+    //     print_transport_helper(str.data());
+    // }
+
+    // static void print_transport_helper(const char* str) {
+    //     uint8_t len = strlen(str);
+    //     for (size_t i = 0; i < len; ++i) {
+    //         ring_buf.push(str[i]);
+    //     }
+    // }
+
+    // static void print_transport_helper(std::string_view str) {
+    //     for (auto& c : str) {
+    //         ring_buf.push(c);
+    //     }
+    // }
 };
 
 #endif
