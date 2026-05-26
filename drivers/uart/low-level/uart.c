@@ -35,8 +35,8 @@ USART_Status USART_HardwareInit(USART_InitTypeDef* p_Config) {
             break;
     }
     // Disable USART Device during configuration
-
     CLEAR_BIT(p_UART->CR1, USART_CR1_UE);
+
     // 2. Configure Baud Rate
     SET_BIT(p_UART->BRR, p_Config->BaudRate);
 
@@ -56,34 +56,8 @@ USART_Status USART_HardwareInit(USART_InitTypeDef* p_Config) {
             break;
     }
 
-    // 4. Configure Interrupt
-    if (READ_BIT(p_Config->Interrupt, USART_CR1_IDLEIE)) {  // Bit 4
-        SET_BIT(p_UART->CR1, USART_CR1_IDLEIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR1_RXNEIE)) {  // Bit 5
-        SET_BIT(p_UART->CR1, USART_CR1_RXNEIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR1_TCIE)) {  // Bit 6
-        SET_BIT(p_UART->CR1, USART_CR1_TCIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR1_TXEIE)) {  // Bit 7
-        SET_BIT(p_UART->CR1, USART_CR1_TXEIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR1_PEIE)) {  // Bit 8
-        SET_BIT(p_UART->CR1, USART_CR1_PEIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR2_LBDIE)) {  // Bit 6
-        SET_BIT(p_UART->CR2, USART_CR2_LBDIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR3_CTSIE)) {  // Bit 10
-        SET_BIT(p_UART->CR3, USART_CR3_CTSIE);
-    }
-    if (READ_BIT(p_Config->Interrupt, USART_CR3_EIE)) {  // Bit 0
-        SET_BIT(p_UART->CR3, USART_CR3_EIE);
-    }
-    if ((p_Config->Interrupt && 0xFFFF) != 0) {
-        My_NVIC_EnableIRQ(38);
-    }
+    // 4. Enable Interrupt
+    My_NVIC_EnableIRQ(38);
 
     // 5. Enable USART Device
     SET_BIT(p_UART->CR1, USART_CR1_UE);
@@ -121,11 +95,7 @@ USART_Status USART_ReceiveByte(USART_TypeDef* p_Instance, char* pData) {
     return USART_OK;
 }
 
-USART_Status USART_Data_Available() {
-    return rx_head != rx_tail ? USART_OK : USART_ERR;
-}
-
-USART_Status USART_WriteRxBuffer() {
+USART_Status USART_WriteRxBuffer(void) {
     char data = (char)USART2->DR;
 
     // Push data into buffer
@@ -145,6 +115,6 @@ USART_Status USART_ReadRxBuffer(char* c) {
     return USART_OK;
 }
 
-uint16_t USART_GetRxBufferSize() {
+uint16_t USART_GetRxBufferSize(void) {
     return rx_head - rx_tail;
 }

@@ -15,11 +15,11 @@ USART_TypeDef* USART_GetBaseAddress(USART_DevNum dev);
 USART_Status   USART_SendByte(USART_TypeDef* p_Instance, int ch);
 USART_Status   USART_ReceiveByte(USART_TypeDef* p_Instance, char* pData);
 
-USART_Status   USART_WriteRxBuffer();
+USART_Status   USART_WriteRxBuffer(void);
 USART_Status   USART_ReadRxBuffer(char* c);
-uint16_t       USART_GetRxBufferSize();
+uint16_t       USART_GetRxBufferSize(void);
 
-USART_Status   USART_Data_Available();
+USART_Status   USART_Data_Available(void);
 void           USART2_IRQHandler(void);
 
 #ifdef __cplusplus

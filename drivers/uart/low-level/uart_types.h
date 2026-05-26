@@ -14,7 +14,6 @@ typedef struct {
     USART_DevNum   device;
     USART_CommType CommType;
     USART_BaudRate BaudRate;
-    uint32_t       Interrupt;
 } USART_InitTypeDef;
 
 #endif

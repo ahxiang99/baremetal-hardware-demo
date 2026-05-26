@@ -2,6 +2,7 @@
 #define UART_HPP
 
 #include "low-level/uart.h"
+#include "low-level/uart_registers.h"
 
 class UARTDevice {
    private:
@@ -26,7 +27,6 @@ class UARTDevice {
 
     USART_Status Print(const char* buffer, uint16_t size);  // Print to Console
     USART_Status Get(char* c);
-
     const char*  GetLine();
 };
 
