@@ -29,7 +29,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -65,6 +65,8 @@ set(sources_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG/cpp/usbotg.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/low-level/DMA.c
+
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
     
@@ -82,7 +84,8 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/USB-OTG
-    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/logger
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
 )
 
 # Include directories for each compiler

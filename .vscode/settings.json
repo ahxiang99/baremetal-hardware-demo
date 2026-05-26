@@ -2,8 +2,17 @@
   "cmake.cmakePath": "cube-cmake",
   "cmake.configureArgs": ["-DCMAKE_COMMAND=cube-cmake"],
   "cmake.preferredGenerators": ["Ninja"],
-  "clangd.path": "cube",
+  "clangd.path": "clangd",
+  "clangd.arguments": [
+    "--query-driver=C:/Users/ahxia/AppData/Local/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gcc.exe",
+    "--query-driver=C:/Users/ahxia/AppData/Local/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-g++.exe"
+  ],
   "editor.fontFamily": "'JetBrains Mono', 'Courier New', monospace",
   "editor.fontLigatures": true,
-  "stm32cube-ide-clangd.path": "cube"
+  "stm32cube-ide-clangd.path": "cube",
+  "stm32cube-ide-clangd.arguments": [
+    "starm-clangd",
+    "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gcc*",
+    "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-g++*"
+  ]
 }

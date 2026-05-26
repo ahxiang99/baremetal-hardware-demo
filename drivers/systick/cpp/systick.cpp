@@ -23,7 +23,7 @@ uint32_t MySysTick::get_ticks() const {
 }
 
 void MySysTick::tick() {
-    tickCount++;
+    tickCount = tickCount + 1;
 }
 
 void MySysTick::delay_ms(uint32_t ms) const {
