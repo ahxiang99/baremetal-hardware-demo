@@ -21,8 +21,6 @@ class MySysTick {
     void     delay_ms(uint32_t ms) const;
 };
 
-extern MySysTick timer;
-
-extern "C" void  SysTick_Handler();
+extern "C" void SysTick_Handler();
 
 #endif  // SYSTICK_HPP

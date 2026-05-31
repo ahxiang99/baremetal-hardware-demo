@@ -47,4 +47,6 @@
 #define I2C_CR2_DMAEN (1 << 11)
 #define I2C_CR2_LAST (1 << 12)
 
+#define I2C_OAR1_ADDMODE (1 << 15)
+
 #endif

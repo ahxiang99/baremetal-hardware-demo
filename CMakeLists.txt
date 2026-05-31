@@ -47,23 +47,27 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/gpio.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/low-level/gpio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
  
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/uart.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/low-level/uart.c
-    
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/i2c.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/low-level/i2c.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/InterruptUart.cpp 
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/low-level/tim.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
+
+    # Middleware
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/cli.cpp
 )
 
 # Include directories for all compilers
@@ -73,6 +77,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
@@ -146,58 +151,25 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS})
 
 # Compiler options
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
-    ${cpu_PARAMS}
-    ${compiler_OPTS}
-    -fstack-usage
-    # -fcyclomatic-complexity
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wno-unused-parameter
-
+target_compile_options(${PROJECT_NAME} PRIVATE
+    -mcpu=cortex-m4
+    -mthumb
+    -mfloat-abi=hard
+    -mfpu=fpv4-sp-d16
     -ffunction-sections
     -fdata-sections
-
-    $<$<COMPILE_LANGUAGE:C>: >
-    $<$<COMPILE_LANGUAGE:CXX>:
-
-    # -Wno-volatile
-    # -Wold-style-cast
-    # -Wuseless-cast
-    # -Wsuggest-override
-    >
-    $<$<COMPILE_LANGUAGE:ASM>:-x assembler-with-cpp -MMD -MP>
-    $<$<CONFIG:Debug>:-O0 -g3 -ggdb>
-    $<$<CONFIG:Release>:-Os>
+    -O0 # Keep optimization at zero to isolate register timing anomalies
 )
 
-# Linker options
-target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-    -T${linker_script_SRC}
-    ${cpu_PARAMS}
-    ${linker_OPTS}
-    -Wl,-Map=${CMAKE_PROJECT_NAME}.map
-    -u _printf_float # STDIO float formatting support (remove if not used)
-    --specs=nosys.specs
-    -Wl,--start-group
-    -lc
-    -lm
-    -lstdc++
-    -lsupc++
-    -Wl,--end-group
-    -Wl,-z,max-page-size=8 # Allow good software remapping across address space (with proper GCC section making)
-    -Wl,--print-memory-usage
+target_link_options(${PROJECT_NAME} PRIVATE
+    -mcpu=cortex-m4
+    -mthumb
+    -mfloat-abi=hard
+    -mfpu=fpv4-sp-d16
     -Wl,--gc-sections
+    -Wl,--print-memory-usage
+    --specs=nosys.specs
 )
-
-# Conditionally add CMSE linker options
-if(CMSIS_Dsecure STREQUAL "Secure")
-    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-        -Wl,--cmse-implib
-        -Wl,--out-implib=secure_nsclib.o
-    )
-endif()
 
 # Set linker script as a dependency to force re-link if it changes
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_DEPENDS ${linker_script_SRC})
@@ -208,3 +180,7 @@ add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.bin
 )
+
+
+# Specify the header file(s) you want to precompile
+target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/Inc/pch.hpp>")

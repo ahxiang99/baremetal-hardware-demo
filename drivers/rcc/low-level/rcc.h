@@ -12,7 +12,7 @@ extern "C" {
 #include "rcc_registers.h"
 #include "status.h"
 
-status_t Init48MHzForUSB(void);
+void Init48MHzForUSB(void);
 #ifdef __cplusplus
 }
 #endif

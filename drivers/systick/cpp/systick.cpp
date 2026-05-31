@@ -4,6 +4,8 @@
 
 #include "low-level/nvic.h"
 
+extern MySysTick my_systick;
+
 MySysTick::MySysTick() {}
 
 void MySysTick::init() {
@@ -32,5 +34,5 @@ void MySysTick::delay_ms(uint32_t ms) const {
 }
 
 extern "C" void SysTick_Handler() {
-    timer.tick();
+    my_systick.tick();
 }

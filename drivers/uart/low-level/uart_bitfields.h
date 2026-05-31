@@ -32,8 +32,11 @@
 #define USART_CR1_OVER8 (1 << 15)
 
 #define USART_CR2_LBDIE (1 << 6)
+#define USART_CR2_STOP (3 << 12)
 
 #define USART_CR3_EIE (1 << 0)
+#define USART_CR3_DMAR (1 << 6)
+#define USART_CR3_DMAT (1 << 7)
 #define USART_CR3_CTSIE (1 << 10)
 
 #define USART1 ((USART_TypeDef*)USART1_BASE)

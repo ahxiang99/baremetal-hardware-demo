@@ -6,19 +6,11 @@
 #include "low-level/uart.h"
 #include "low-level/uart_types.h"
 
-/**
- * @brief Initialize the UART Device
- *
- * This function processes init the USART driver.
- *
- *
- * @param p_Config A pointer to the UART Config.
- * @return An object of UART Driver.
- */
 UARTDevice::UARTDevice(USART_InitTypeDef* p_Config) : m_pInstance(USART_GetBaseAddress(p_Config->device)), m_pConfig(p_Config), m_Init(false), m_LineIdx(0) {
     if (m_pInstance == nullptr || m_pConfig == nullptr) return;
     m_Init = InitDriver(m_pConfig);
 }
+
 UARTDevice::UARTDevice() : m_pInstance(nullptr), m_pConfig(nullptr), m_Init(false), m_LineIdx(0) {}
 
 bool UARTDevice::InitDriver(USART_InitTypeDef* p_Config) {
@@ -34,15 +26,6 @@ bool UARTDevice::InitDriver(USART_InitTypeDef* p_Config) {
     }
 }
 
-/**
- * @brief Initialize the UART Pin
- *
- * This function init the UART TX and RX PIN
- *
- *
- * @param
- * @return Status OK if success, else failed.
- */
 USART_Status UARTDevice::SetupPin() {
     // 1. Initialize the GPIO Pin for respective USARTx.
     GPIO_InitTypeDef gpio_cfg;
@@ -74,64 +57,16 @@ USART_Status UARTDevice::Print(const char* buffer, uint16_t max_size) {
     if (!m_Init || buffer == nullptr || max_size <= 0) return USART_ERR;
 
     for (uint16_t i = 0; i < max_size; ++i) {
-        USART_SendByte(m_pInstance, buffer[i]);
+        USART_Transmit(m_pInstance, buffer[i]);
     }
     return USART_OK;
 }
 
 USART_Status UARTDevice::Get(char* c) {
     if (!m_Init || c == nullptr) return USART_ERR;
-    return USART_ReceiveByte(m_pInstance, c);
+    return USART_Receive(m_pInstance, c);
 }
 
 const char* UARTDevice::GetLine() {
     return m_Buffer;
-}
-
-bool UARTDevice::HandleInput() {
-    char c;
-    while (DataAvailable()) {
-        // --- START CRITICAL SECTION ---
-        My_NVIC_DisableIRQ(38);
-        bool dataReceived = (USART_ReadRxBuffer(&c) == USART_OK);
-        My_NVIC_EnableIRQ(38);
-        // --- END CRITICAL SECTION ---
-
-        if (!dataReceived) return false;
-
-        switch (c) {
-            case '\r':  // Carriage Return (Enter)
-            case '\n':
-                if (m_LineIdx > 0) {             // Only process if something was typed
-                    m_Buffer[m_LineIdx] = '\0';  // Null terminate
-                    m_LineIdx           = 0;     // Reset for next time
-                    Print("\r\n", 2);            // Echo newline to user
-                    return true;
-                }
-                Print("\r\nNode > ", 9);  // Just a fresh line if empty
-                break;
-            case '\b':  // Backspace (ASCII 8)
-            case 0x7F:  // Delete (often sent as backspace by some terminals)
-                if (m_LineIdx > 0) {
-                    m_LineIdx--;
-                    Print("\b \b", 3);  // Move back, overwrite with space, move back again
-                }
-                break;
-
-            default:
-                // Only add printable characters and check for buffer overflow
-                if (c >= 32 && c <= 126) {
-                    if (m_LineIdx < (UART_BUF_SIZE - 1)) {
-                        m_Buffer[m_LineIdx++] = (char)c;
-                        Print(&c, 1);  // Echo character so the user sees what they type
-                    }
-                }
-                break;
-        }
-    }
-    return false;
-}
-
-USART_Status UARTDevice::DataAvailable() {
-    return USART_Data_Available();
 }

@@ -12,7 +12,6 @@ volatile uint16_t rx_tail = 0;
 
 void              USART2_IRQHandler(void) {
     if (USART2->SR & USART_SR_RXNE) {
-        USART_WriteRxBuffer();
     }
 }
 
@@ -77,7 +76,7 @@ USART_TypeDef* USART_GetBaseAddress(USART_DevNum dev_num) {
     }
 }
 
-USART_Status USART_SendByte(USART_TypeDef* p_Instance, int ch) {
+USART_Status USART_Transmit(USART_TypeDef* p_Instance, uint8_t ch) {
     // Polling Method
     if (!p_Instance) return USART_ERR;
 
@@ -86,35 +85,11 @@ USART_Status USART_SendByte(USART_TypeDef* p_Instance, int ch) {
     return USART_OK;
 }
 
-USART_Status USART_ReceiveByte(USART_TypeDef* p_Instance, char* pData) {
+USART_Status USART_Receive(USART_TypeDef* p_Instance, char* pData) {
     // Polling Method
     if (!p_Instance || !pData) return USART_ERR;
 
     while (!(p_Instance->SR & USART_SR_RXNE));
     *pData = p_Instance->DR;
     return USART_OK;
-}
-
-USART_Status USART_WriteRxBuffer(void) {
-    char data = (char)USART2->DR;
-
-    // Push data into buffer
-    uint16_t next = (rx_head + 1) & (64 - 1);
-
-    if (next != rx_tail) {
-        rx_buffer[rx_head] = data;
-        rx_head            = next;
-    }
-    return USART_OK;
-}
-
-USART_Status USART_ReadRxBuffer(char* c) {
-    if (rx_head == rx_tail) return USART_ERR;
-    *c      = rx_buffer[rx_tail];
-    rx_tail = (rx_tail + 1) % 256;
-    return USART_OK;
-}
-
-uint16_t USART_GetRxBufferSize(void) {
-    return rx_head - rx_tail;
 }

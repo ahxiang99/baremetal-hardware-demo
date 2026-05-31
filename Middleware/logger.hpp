@@ -10,6 +10,9 @@
 
 #include "../Middleware/RingBuffer.hpp"
 #include "RingBuffer.hpp"
+#include "cpp/DmaUart.hpp"
+#include "cpp/IUart.hpp"
+#include "cpp/Stm32Uart.hpp"
 #include "cpp/uart.hpp"
 
 #ifdef NDEBUG
@@ -21,8 +24,7 @@
 #define LOG_INFO(fmt, ...) Logger::Log(LogLevel::INFO, fmt, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) Logger::Log(LogLevel::WARN, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) Logger::Log(LogLevel::ERROR, fmt, ##__VA_ARGS__)
-
-extern UARTDevice UART2;
+#define LOG_PRINT(fmt, ...) Logger::Print(fmt, ##__VA_ARGS__)
 
 enum class LogLevel : uint8_t { DBG = 1, INFO, WARN, ERROR };
 
@@ -34,6 +36,10 @@ struct Hex {
 class Logger {
    public:
     Logger() = delete;  // No Constructor -> Logger to run as a Singleton.
+
+    static void Init(IUart& uart) {
+        get_uart_device() = &uart;
+    }
 
     static void set_level(LogLevel level) {
         get_current_level() = level;
@@ -52,36 +58,23 @@ class Logger {
         print_transport("\r\n");
     }
 
-    static void Logging() {
-        if (dma_busy) return;
-
-        if (ring_buf.empty()) return;
-
-        uint8_t transfer_size = ring_buf.size();
-        if (transfer_size > BUF_SIZE) {
-            transfer_size = BUF_SIZE;
-        }
-
-        for (size_t i = 0; i < transfer_size; ++i) {
-            auto temp = ring_buf.pop();
-            if (temp.has_value()) {
-                tx_dma_buffer_A.at(i) = temp.value();
-            }
-        }
-        tx_dma_buffer_B.swap(tx_dma_buffer_A);
-
-        tx_dma_buffer_A.fill(0);
+    template <typename... Args>
+    static void Print(std::string_view format, Args&&... args) {
+        // Print Message
+        process_format(format, std::forward<Args>(args)...);
+        // Line Termination
+        print_transport("\r\n");
     }
 
    private:
-    static uint8_t                      dma_busy;
-    static inline std::array<char, 128> tx_dma_buffer_A;
-    static inline std::array<char, 128> tx_dma_buffer_B;
-    static inline RingBuffer<char>      ring_buf;
-
-    static LogLevel&                    get_current_level() {
+    static LogLevel& get_current_level() {
         static LogLevel current_level = LogLevel::INFO;
         return current_level;
+    }
+
+    static IUart*& get_uart_device() {
+        static IUart* uart = nullptr;
+        return uart;
     }
 
     static void print_prefix(LogLevel& level) {
@@ -120,62 +113,45 @@ class Logger {
         process_format(format.substr(placeholder + 2), std::forward<Args>(rest)...);
     }
 
-    static void print_arguments(float_t val) {
+    static void print_arguments(const float_t& val) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%.2f", val);
         print_transport(buf);
     }
 
-    static void print_arguments(uint32_t val) {
+    static void print_arguments(const uint32_t& val) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%02u", (unsigned int)val);
         print_transport(buf);
     }
 
-    static void print_arguments(uint16_t val) {
+    static void print_arguments(const uint16_t& val) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%02u", (unsigned int)val);
         print_transport(buf);
     }
 
-    static void print_arguments(Hex val) {
+    static void print_arguments(const Hex& val) {
         char buf[16];
         snprintf(buf, sizeof(buf), "0x%08X", (unsigned int)val.value);
         print_transport(buf);
     }
 
-    static void print_arguments(std::string_view val) {
+    static void print_arguments(const std::string_view& val) {
         print_transport(val.data());
     }
 
     static void print_transport(const char* str) {
-        UART2.Print(str, strlen(str));
+        if (auto uart = get_uart_device()) {
+            uart->send(reinterpret_cast<const uint8_t*>(str), strlen(str));
+        }
     }
 
-    static void print_transport(std::string_view str) {
-        UART2.Print(str.data(), str.size());
+    static void print_transport(const std::string_view& str) {
+        if (auto uart = get_uart_device()) {
+            uart->send(reinterpret_cast<const uint8_t*>(str.data()), str.size());
+        }
     }
-
-    // static void print_transport(const char* str) {
-    //     print_transport_helper(str);
-    // }
-
-    // static void print_transport(std::string_view str) {
-    //     print_transport_helper(str.data());
-    // }
-
-    // static void print_transport_helper(const char* str) {
-    //     uint8_t len = strlen(str);
-    //     for (size_t i = 0; i < len; ++i) {
-    //         ring_buf.push(str[i]);
-    //     }
-    // }
-
-    // static void print_transport_helper(std::string_view str) {
-    //     for (auto& c : str) {
-    //         ring_buf.push(c);
-    //     }
-    // }
 };
 
 #endif

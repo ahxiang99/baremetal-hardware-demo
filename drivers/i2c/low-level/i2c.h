@@ -4,7 +4,6 @@
 #include "i2c_bitfields.h"
 #include "i2c_registers.h"
 #include "i2c_types.h"
-#include "low-level/i2c.h"
 #include "low-level/i2c_types.h"
 #include "low-level/uart.h"
 #include "low-level/uart_registers.h"

@@ -99,14 +99,14 @@ void I2C1_EV_IRQHandler(void) {
         }
         // Clear ADDR Bit
         volatile uint32_t temp = hI2C1.pInstance->SR1;
-        temp          = hI2C1.pInstance->SR2;
+        temp                   = hI2C1.pInstance->SR2;
         (void)temp;
 
         if (hI2C1.State == I2C_BUSY_RX && hI2C1.Count == 1) {
             SET_BIT(hI2C1.pInstance->CR1, I2C_CR1_STOP);
         }
         return;
-    }  
+    }
     // TXE Flag: Data register empty, ready for next byte
     else if (READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_TXE) && !(READ_BIT(hI2C1.pInstance->SR1, I2C_SR1_BTF)) && (hI2C1.State == I2C_BUSY_TX)) {
         if (hI2C1.Count > 0) {
@@ -177,14 +177,6 @@ void I2C1_ER_IRQHandler(void) {
 
     // CRITICAL: Disable interrupts so we don't loop forever in an error state
     CLEAR_BIT(I2C1->CR2, I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
-}
-
-I2C_Status I2C_Print(USART_TypeDef* p_Instance, const char* buffer, uint16_t max_size) {
-    if (!p_Instance) return I2C_ERR;
-    for (uint16_t i = 0; i < max_size; ++i) {
-        USART_SendByte(p_Instance, buffer[i]);
-    }
-    return I2C_OK;
 }
 
 I2C_Status I2C_SendCommand(I2C_TypeDef* pInstance, uint8_t target_addr, uint8_t* pCmd, uint16_t pCmdSize) {

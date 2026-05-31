@@ -1,119 +1,182 @@
-#include <math.h>
-#include <stddef.h>
-
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <iterator>
-#include <string_view>
-
+#include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
+#include "RingBuffer.hpp"
 #include "SHT4X.hpp"
 #include "Sensor.hpp"
-#include "bit_utils.h"
-#include "drivers/gpio/cpp/gpio.hpp"
-#include "drivers/i2c/cpp/i2c.hpp"
+#include "Sht40ad1b.hpp"
+#include "cpp/IGpio.hpp"
+#include "cpp/IUart.hpp"
+#include "cpp/InterruptI2C.hpp"
+#include "cpp/Stm32I2C.hpp"
+#include "cpp/Stm32Timer.hpp"
+#include "drivers/gpio/cpp/Stm32GpioPin.hpp"
 #include "drivers/systick/cpp/systick.hpp"
 #include "drivers/timer/low-level/tim.h"
+#include "drivers/uart/cpp/DmaUart.hpp"
+#include "drivers/uart/cpp/InterruptUart.hpp"
+#include "drivers/uart/cpp/Stm32Uart.hpp"
 #include "drivers/uart/cpp/uart.hpp"
+#include "low-level/gpio_registers.h"
+#include "low-level/gpio_types.h"
+#include "low-level/tim_registers.h"
+#include "low-level/tim_types.h"
+#include "low-level/uart_types.h"
+#include "pch.hpp"
 
 #define CPACR (*((volatile uint32_t*)0xE000ED88))
 
-struct FloatIntExtraction {
-    uint16_t Integer;
-    uint16_t Decimal;
-};
-
-FloatIntExtraction convertInt(float_t value) {
-    FloatIntExtraction result = {0, 0};
-    result.Integer            = (uint16_t)value;
-    result.Decimal            = (uint16_t)((value - (float)result.Integer) * 100.0f);
-    return result;
-}
-
 // Global Variables
-volatile bool trigger_measurement = false;
-MySysTick     timer;
+MySysTick     my_systick;
+Stm32GpioPin  gpio_led;
+InterruptUart uart2;
+Stm32Timer    timer;
+Cli           cmd(uart2);
+InterruptI2C  i2c1;
+Sht40ad1b     temp_sensor(i2c1, "SHT40");
 
-GPIO          GPIO_CTL_A;
-GPIO          GPIO_CTL_B;
-UARTDevice    UART2;
-i2c_device    hi2c1;
-SHT4X         Sensor_t;
+/* Function Prototype */
+void Init_Driver();
+void RegisterCallback();
 
-void          Init_All_Driver() {
-    Logger::set_level(LogLevel::DBG);
-
-    USART_InitTypeDef uart_cfg{USART_D2, RX_TX, _9600};
-    UART2.InitDriver(&uart_cfg);
-    LOG_DEBUG("Booting...");
-    LOG_DEBUG("USART2 Initialized");
-
-    GPIO_InitTypeDef cfg_i2C{GPIO_PB, GPIO_PIN_8 | GPIO_PIN_9, GPIO_MODE_ALTFN, GPIO_OTYPER_OD, GPIO_OSPEEDR_LS, GPIO_PUPDR_PULLUP, 0x04};
-    GPIO_CTL_B.InitDriver(&cfg_i2C);
-    LOG_DEBUG("GPIOB Initialized");
-
-    I2C_InitTypeDef i2c1_Config{I2C_1, I2C_SPEED_STANDARD, 0, 0, 0, 0};
-    hi2c1.InitDriver(&i2c1_Config);
-    LOG_DEBUG("I2C1 Initialized");
-
-    // To Blink LED
-    GPIO_InitTypeDef cfg{GPIO_PA, GPIO_PIN_5, GPIO_MODE_OUTPUT, GPIO_OTYPER_PP, GPIO_OSPEEDR_LS, GPIO_PUPDR_NOPULL, 0};
-    GPIO_CTL_A.InitDriver(&cfg);
-    LOG_DEBUG("GPIOA Initialized");
-
-    LOG_DEBUG("Initialized Done...");
-}
-
+/* Main Program Start Here */
 int main() {
-    // Enable FPU by setting bits 20, 21, 22, and 23
-    CPACR |= ((3UL << 20) | (3UL << 22));
+    Init_Driver();
+    RegisterCallback();
 
-    // Manual Barrier        instructions(Assembly)
-    __asm volatile("dsb 0xf" ::: "memory");
-    __asm volatile("isb 0xf" ::: "memory");
-
-    Init_All_Driver();
-
-    timer.init();
-
-    TIM_InitTypeDef Tim_Config{APB1_TIMER_3, 999, 15999, TIM_COUNTERMODE_UP, TIM_CLOCKDIVISION_DIV1, TIM_AUTORELOAD_PRELOAD_ENABLE};
-    TIM_TypeDef*    Timer = TIM3;
-
-    TIM_Init(Timer, &Tim_Config);
-
-    Sensor_t.Init(hi2c1, 0x88, "SHT40AD1B");
+    if (!timer.isRunning()) {
+        timer.start(500);
+    }
 
     while (1) {
-        if (trigger_measurement) {
-            Sensor_t.SetState(SensorState::MEASURING);
-            Sensor_t.StartRead_IT();
-            trigger_measurement = false;
+        uart2.processRx();
+        i2c1.processRx();
+
+        if (cmd.getState() == CliState::WaitingForInput) {
+            cmd.get_input();
+            cmd.setState(CliState::Processing);
         }
 
-        timer.delay_ms(10);
-        Sensor_t.StartRead_IT();
-        // Read and Print Data to Console
-        float_t temp = Sensor_t.getTemp();
-        float_t rh   = Sensor_t.getRh();
-        if (temp != 0.0f && trigger_measurement) {
-            FloatIntExtraction result_temp = convertInt(temp);
-            LOG_INFO("Temp Reading: {}.{}", result_temp.Integer, result_temp.Decimal);
-        }
-        if (rh != 0.0f && trigger_measurement) {
-            FloatIntExtraction result_rh = convertInt(rh);
-            LOG_INFO("RH Reading: {}.{}", result_rh.Integer, result_rh.Decimal);
+        if (timer.isElapsed()) {
+            gpio_led.Toggle();
+            timer.start(500);
         }
     }
     return 0;
 }
 
+/* Function Definition */
+
+void Init_Driver() {
+    // Enable FPU by setting bits 20, 21, 22, and 23
+    CPACR |= ((3UL << 20) | (3UL << 22));
+    // Manual Barrier        instructions(Assembly)
+    __asm volatile("dsb 0xf" ::: "memory");
+    __asm volatile("isb 0xf" ::: "memory");
+
+    /* MySysTick Init*/
+    my_systick.init();
+
+    /* Configure Uart2 Pin */
+    GPIO_Config uart2_gpio_cfg;
+    uart2_gpio_cfg.port  = GPIO_Port::GPIO_PA;
+    uart2_gpio_cfg.pin   = GPIO_PIN_2 | GPIO_PIN_3;
+    uart2_gpio_cfg.mode  = GPIO_Moder::GPIO_MODE_ALTFN;
+    uart2_gpio_cfg.ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS;
+    uart2_gpio_cfg.otype = GPIO_OType::GPIO_OTYPER_PP;
+    uart2_gpio_cfg.pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL;
+    uart2_gpio_cfg.afr   = GPIO_AFR::GPIO_AF7_USART1_2;
+
+    Stm32GpioPin gpio_uart2(GPIOA, uart2_gpio_cfg);
+    gpio_uart2.Init();
+
+    /* Configure Uart */
+    UartConfig uart2_cfg;
+    uart2_cfg.dev_num  = UartNum::USART_D2;
+    uart2_cfg.baudRate = UartBaudRate::_9600;
+    uart2_cfg.comm     = UartComm::RX_TX;
+    uart2_cfg.parity   = UartParity::NONE;
+    uart2_cfg.stopbits = UartStopBit::STOP_1;
+
+    uart2.setVariable(USART2, uart2_cfg);
+    uart2.initialize();
+
+    /* Logger Init */
+    Logger::Init(uart2);
+    Logger::set_level(LogLevel::DBG);
+
+    LOG_INFO("Booting...");
+    LOG_INFO("System Initialized via IUart interface!");
+    LOG_INFO("USART2 Initialized");
+
+    I2C_Config i2c_config;
+    i2c_config.ClockFreq      = I2C_Clk_Freq::_100KHz;
+    i2c_config.AddressingMode = I2C_Addressing_Mode::AddressMode_7Bit;
+    i2c_config.OwnAddress1    = 0;
+    i2c_config.OwnAddress2    = 0;
+
+    i2c1.setVariable(I2C1, i2c_config);
+    i2c1.initialize();
+
+    LOG_INFO("I2C1 Initialized");
+
+    /* Timer */
+    TimerConfig timer_cfg;
+    timer_cfg.Instance          = APB1_TIMER_3;
+    timer_cfg.CounterMode       = TIM_COUNTERMODE_UP;
+    timer_cfg.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+    timer_cfg.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+
+    timer.setVariable(TIM3, timer_cfg);
+
+    /* Blinking LED */
+    GPIO_Config gpio_led_cfg;
+    gpio_led_cfg.port  = GPIO_Port::GPIO_PA;
+    gpio_led_cfg.pin   = GPIO_PIN_5;
+    gpio_led_cfg.mode  = GPIO_Moder::GPIO_MODE_OUTPUT;
+    gpio_led_cfg.otype = GPIO_OType::GPIO_OTYPER_PP;
+    gpio_led_cfg.ospdr = GPIO_OSPDR::GPIO_OSPEEDR_LS;
+    gpio_led_cfg.pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL;
+    gpio_led_cfg.afr   = GPIO_AFR::GPIO_AF0_SYSTEM;
+
+    gpio_led.setVariable(GPIOA, gpio_led_cfg);
+    gpio_led.Init();
+    gpio_led.Toggle();
+    LOG_INFO("Initialized Done...");
+}
+
+void RegisterCallback() {
+    uart2.onDataReceived([&](const uint8_t* data, size_t len) { cmd.onUartData(data, len); });
+    i2c1.onDataReceived([&]() {
+        if (temp_sensor.getState() == SensorState::WAIT_DATA) {
+            temp_sensor.setState(SensorState::DATA_READY);
+            temp_sensor.ProcessData();
+        }
+        cmd.setState(CliState::WaitingForInput);
+    });
+}
+
+/* Interrupt Handler Function Start Here*/
+
 void TIM3_IRQHandler(void) {
-    if (TIM3->SR & TIM_SR_UIF) {
-        CLEAR_BIT(TIM3->SR, TIM_SR_UIF);
-        // Your code here (e.g., toggle an LED)
-        GPIO_CTL_A.TogglePin(GPIO_PIN_5);
-        trigger_measurement = true;
-    }
+    timer.handleInterrupt();
+}
+
+extern "C" void DMA1_Stream6_IRQHandler(void) {
+    uart2.handleTxDmaInterrupt();
+}
+
+extern "C" void DMA1_Stream5_IRQHandler(void) {
+    uart2.handleRxDmaInterrupt();
+}
+
+extern "C" void USART2_IRQHandler(void) {
+    uart2.handleInterrupt();
+}
+
+extern "C" void I2C1_EV_IRQHandler(void) {
+    i2c1.handleEVInterrupt();
+}
+
+extern "C" void I2C1_ER_IRQHandler(void) {
+    i2c1.handleERInterrupt();
 }

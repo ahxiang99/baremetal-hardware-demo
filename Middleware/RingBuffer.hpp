@@ -1,12 +1,12 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 
-#define BUF_SIZE 128
-
-template <typename T>
+template <typename T, size_t BUF_SIZE>
 class RingBuffer {
    private:
     size_t                  head = 0;
@@ -44,5 +44,18 @@ class RingBuffer {
         if (full) return BUF_SIZE;
         if (head >= tail) return head - tail;
         return BUF_SIZE + head - tail;
+    }
+
+    uintptr_t data_ptr() const {
+        return reinterpret_cast<uintptr_t>(buf_data.data());
+    }
+
+    void sync_dma_head(size_t dma_ndtr) {
+        head = BUF_SIZE - dma_ndtr;
+        full = false;
+    }
+
+    void remove_last() {
+        head--;
     }
 };

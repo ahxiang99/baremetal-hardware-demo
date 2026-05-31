@@ -2,6 +2,9 @@
 
 #include <cstddef>
 
+#include "low-level/gpio_types.h"
+
+
 GPIO::GPIO(GPIO_InitTypeDef* p_Config) : m_pInstance{nullptr}, m_pConfig{p_Config}, m_Init{false} {
     if (InitDriver(m_pConfig) == STATUS_OK) {
         m_Init = true;
@@ -33,7 +36,7 @@ Result GPIO::ResetDriver() {
     return GPIO_HardwareReset(m_pConfig->PORT);
 }
 
-Result GPIO::SetPinConfig(GPIO_Config* p_Config) {
+Result GPIO::SetPinConfig(GPIO_InitTypeDef* p_Config) {
     if (p_Config == nullptr) return ERR_NULLPTR;
 
     if (m_Init) {
