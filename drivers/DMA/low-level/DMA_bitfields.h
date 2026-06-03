@@ -117,6 +117,7 @@
 #define DMA_SCR_PFCTRL (1 << 5)
 #define DMA_SCR_DIR_Pos 6
 #define DMA_SCR_CIRC (1 << 8)
+#define DMA_SCR_CIRC_Pos 8
 #define DMA_SCR_PINC (1 << 9)
 #define DMA_SCR_MINC (1 << 10)
 #define DMA_SCR_PSIZE_Pos (1 << 11)

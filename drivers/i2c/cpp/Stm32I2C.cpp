@@ -235,6 +235,7 @@ bool Stm32I2C::initialize() {
     enablePeripheralClock();
     configureI2C();
     enableI2C();
+    onPostI2CInit();
     state_ = I2C_State::READY;
     return true;
 }

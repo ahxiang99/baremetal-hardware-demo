@@ -10,15 +10,17 @@
 
 #include "RingBuffer.hpp"
 #include "Sht40ad1b.hpp"
+#include "cpp/DmaI2C.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/IUart.hpp"
 #include "cpp/InterruptI2C.hpp"
+#include "cpp/Stm32I2C.hpp"
 #include "cpp/systick.hpp"
 #include "logger.hpp"
 
 extern MySysTick              my_systick;
 
-extern InterruptI2C           i2c1;
+extern DmaI2C                 i2c1;
 
 extern Sht40ad1b              temp_sensor;
 
@@ -30,8 +32,6 @@ struct cmd {
     std::array<char, 64>  cmd_name;
     std::function<void()> callBack;
 };
-
-void get_temp();
 
 enum class CliState { WaitingForInput, Processing, Executing };
 

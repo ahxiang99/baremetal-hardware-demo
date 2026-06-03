@@ -9,18 +9,19 @@
 template <typename T, size_t BUF_SIZE>
 class RingBuffer {
    private:
-    size_t                  head = 0;
-    size_t                  tail = 0;
+    volatile size_t         head = 0;
+    volatile size_t         tail = 0;
     bool                    full = false;
     std::array<T, BUF_SIZE> buf_data;
+    static_assert((BUF_SIZE > 0) && ((BUF_SIZE & (BUF_SIZE - 1)) == 0), "Buffer Size must be power of 2.");
 
    public:
     void push(T item) {
         buf_data[head] = item;
         if (full) {
-            tail = (tail + 1) % BUF_SIZE;
+            tail = (tail + 1) & (BUF_SIZE - 1);
         }
-        head = (head + 1) % BUF_SIZE;
+        head = head & (BUF_SIZE - 1);
         full = (head == tail);
     }
 
@@ -28,7 +29,7 @@ class RingBuffer {
         if (empty()) return std::nullopt;
         T item = buf_data[tail];
         full   = false;
-        tail   = (tail + 1) % BUF_SIZE;
+        tail   = tail & (BUF_SIZE - 1);
         return item;
     }
 
@@ -56,6 +57,6 @@ class RingBuffer {
     }
 
     void remove_last() {
-        head--;
+        head = head - 1;
     }
 };

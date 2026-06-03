@@ -1,9 +1,12 @@
+#include <sys/_intsup.h>
+
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
 #include "RingBuffer.hpp"
 #include "SHT4X.hpp"
 #include "Sensor.hpp"
 #include "Sht40ad1b.hpp"
+#include "cpp/DmaI2C.hpp"
 #include "cpp/IGpio.hpp"
 #include "cpp/IUart.hpp"
 #include "cpp/InterruptI2C.hpp"
@@ -11,11 +14,9 @@
 #include "cpp/Stm32Timer.hpp"
 #include "drivers/gpio/cpp/Stm32GpioPin.hpp"
 #include "drivers/systick/cpp/systick.hpp"
-#include "drivers/timer/low-level/tim.h"
 #include "drivers/uart/cpp/DmaUart.hpp"
 #include "drivers/uart/cpp/InterruptUart.hpp"
 #include "drivers/uart/cpp/Stm32Uart.hpp"
-#include "drivers/uart/cpp/uart.hpp"
 #include "low-level/gpio_registers.h"
 #include "low-level/gpio_types.h"
 #include "low-level/tim_registers.h"
@@ -23,16 +24,18 @@
 #include "low-level/uart_types.h"
 #include "pch.hpp"
 
+#define CLI_ENABLE 0
+#define SENSOR_ENABLE 1
+
 #define CPACR (*((volatile uint32_t*)0xE000ED88))
 
 // Global Variables
-MySysTick     my_systick;
-Stm32GpioPin  gpio_led;
-InterruptUart uart2;
-Stm32Timer    timer;
-Cli           cmd(uart2);
-InterruptI2C  i2c1;
-Sht40ad1b     temp_sensor(i2c1, "SHT40");
+MySysTick    my_systick;
+Stm32GpioPin gpio_led;
+DmaUart      uart2;
+Stm32Timer   timer;
+DmaI2C       i2c1;
+Sht40ad1b    temp_sensor(i2c1, "SHT40");
 
 /* Function Prototype */
 void Init_Driver();
@@ -46,19 +49,24 @@ int main() {
     if (!timer.isRunning()) {
         timer.start(500);
     }
-
     while (1) {
-        uart2.processRx();
+#if SENSOR_ENABLE
         i2c1.processRx();
-
+        temp_sensor.ProcessData();
+#endif
+#if CLI_ENABLE
+        uart2.processRx();
         if (cmd.getState() == CliState::WaitingForInput) {
             cmd.get_input();
             cmd.setState(CliState::Processing);
         }
-
+#endif
         if (timer.isElapsed()) {
             gpio_led.Toggle();
             timer.start(500);
+#if !CLI_ENABLE && SENSOR_ENABLE
+            temp_sensor.read();
+#endif
         }
     }
     return 0;
@@ -87,13 +95,18 @@ void Init_Driver() {
     uart2_gpio_cfg.afr   = GPIO_AFR::GPIO_AF7_USART1_2;
 
     Stm32GpioPin gpio_uart2(GPIOA, uart2_gpio_cfg);
+
     gpio_uart2.Init();
 
     /* Configure Uart */
     UartConfig uart2_cfg;
     uart2_cfg.dev_num  = UartNum::USART_D2;
     uart2_cfg.baudRate = UartBaudRate::_9600;
-    uart2_cfg.comm     = UartComm::RX_TX;
+#if CLI_ENABLE
+    uart2_cfg.comm = UartComm::RX_TX;
+#else
+    uart2_cfg.comm = UartComm::TX_ONLY;
+#endif
     uart2_cfg.parity   = UartParity::NONE;
     uart2_cfg.stopbits = UartStopBit::STOP_1;
 
@@ -102,7 +115,7 @@ void Init_Driver() {
 
     /* Logger Init */
     Logger::Init(uart2);
-    Logger::set_level(LogLevel::DBG);
+    Logger::set_level(LogLevel::INFO);
 
     LOG_INFO("Booting...");
     LOG_INFO("System Initialized via IUart interface!");
@@ -145,20 +158,31 @@ void Init_Driver() {
 }
 
 void RegisterCallback() {
+#if CLI_ENABLE
     uart2.onDataReceived([&](const uint8_t* data, size_t len) { cmd.onUartData(data, len); });
+#endif
+#if SENSOR_ENABLE
     i2c1.onDataReceived([&]() {
         if (temp_sensor.getState() == SensorState::WAIT_DATA) {
             temp_sensor.setState(SensorState::DATA_READY);
-            temp_sensor.ProcessData();
         }
-        cmd.setState(CliState::WaitingForInput);
+        // cmd.setState(CliState::WaitingForInput);
     });
+#endif
 }
 
 /* Interrupt Handler Function Start Here*/
 
-void TIM3_IRQHandler(void) {
+extern "C" void TIM3_IRQHandler(void) {
     timer.handleInterrupt();
+}
+
+extern "C" void DMA1_Stream0_IRQHandler(void) {
+    i2c1.handleRxDmaInterrupt();
+}
+
+extern "C" void DMA1_Stream7_IRQHandler(void) {
+    i2c1.handleTxDmaInterrupt();
 }
 
 extern "C" void DMA1_Stream6_IRQHandler(void) {
@@ -179,4 +203,12 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 
 extern "C" void I2C1_ER_IRQHandler(void) {
     i2c1.handleERInterrupt();
+}
+
+void HardFault_Handler(void) {
+    /* Put a breakpoint on the line below */
+    volatile int loop = 1;
+    while (loop) {
+        // If the debugger stops here, a HardFault occurred!
+    }
 }

@@ -50,16 +50,19 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
  
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/InterruptUart.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp 
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
-
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/DmaI2C.cpp
+    
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/low-level/tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
 

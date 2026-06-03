@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "../Middleware/RingBuffer.hpp"
+#include "FloatIntExtraction.hpp"
 #include "RingBuffer.hpp"
 #include "cpp/DmaUart.hpp"
 #include "cpp/IUart.hpp"
@@ -114,9 +115,10 @@ class Logger {
     }
 
     static void print_arguments(const float_t& val) {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.2f", val);
-        print_transport(buf);
+        FloatIntExtraction val_ = convertInt(val);
+        print_arguments(val_.Integer);
+        print_arguments(".");
+        print_arguments(val_.Decimal);
     }
 
     static void print_arguments(const uint32_t& val) {

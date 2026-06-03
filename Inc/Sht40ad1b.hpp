@@ -17,57 +17,43 @@ extern MySysTick my_systick;
 class Sht40ad1b {
    private:
     II2C&                    hi2c;
-    std::array<char, 24>     m_Name;
+    std::array<char, 32>     m_Name;
     float_t                  m_Temp{0.0f};
     float_t                  m_Rh{0.0f};
-    SensorState              m_State = SensorState::IDLE;
+    SensorState              m_State            = SensorState::IDLE;
 
-    static constexpr uint8_t DevAddr = 0x89U;
-    static constexpr uint8_t cmd     = 0xFDU;
+    uint32_t                 measure_start_time = 0;
+
+    static constexpr uint8_t DevAddr            = 0x89U;
+    static constexpr uint8_t cmd                = 0xFDU;
 
     /* Read Instruction Variables */
     std::array<uint8_t, 6> raw_data;
 
    public:
     Sht40ad1b(II2C& mBus, const char* name) : hi2c(mBus) {
-        std::strcpy(m_Name.data(), name);
+        std::strncpy(m_Name.data(), name, strlen(name));
     }
 
     void read() {
-        if (hi2c.Write(DevAddr, &cmd, 1, 3)) {
-            m_State = SensorState::MEASURING;
-            my_systick.delay_ms(30);
-            if (hi2c.Read(DevAddr, raw_data.data(), 6, 3)) {
-                m_State = SensorState::WAIT_DATA;
-                return;
-            } else {
-                m_State = SensorState::IDLE;
-                return;
+        if (m_State == SensorState::IDLE) {
+            if (hi2c.Write(DevAddr, &cmd, 1, 3)) {
+                m_State            = SensorState::MEASURING;
+                measure_start_time = my_systick.get_ticks();
             }
-        } else {
-            m_State = SensorState::IDLE;
-            return;
         }
     }
 
-    float_t getValue() const {
-        return m_Temp;
-    }
-
-    const char* getName() const {
-        return m_Name.data();
-    }
-
-    SensorState getState() const {
-        return m_State;
-    }
-
-    void setState(SensorState&& state) {
-        m_State = state;
-    }
-
     void ProcessData() {
-        if (m_State == SensorState::DATA_READY) {
+        if (m_State == SensorState::MEASURING) {
+            if ((my_systick.get_ticks() - measure_start_time) > 30) {
+                if (hi2c.Read(DevAddr, raw_data.data(), raw_data.size(), 3)) {
+                    m_State = SensorState::WAIT_DATA;
+                } else {
+                    m_State = SensorState::IDLE;
+                }
+            }
+        } else if (m_State == SensorState::DATA_READY) {
             uint16_t temp_value_raw = (raw_data[0] * 0x100U) + raw_data[1];
             uint8_t  temp_value_crc = raw_data[2];
             uint16_t rh_value_raw   = (raw_data[3] * 0x100U) + raw_data[4];
@@ -95,5 +81,21 @@ class Sht40ad1b {
             LOG_PRINT("Rh: {}.{}", t2.Integer, t2.Decimal);
             m_State = SensorState::IDLE;
         }
+    }
+
+    float_t getValue() const {
+        return m_Temp;
+    }
+
+    const char* getName() const {
+        return m_Name.data();
+    }
+
+    SensorState getState() const {
+        return m_State;
+    }
+
+    void setState(SensorState&& state) {
+        m_State = state;
     }
 };

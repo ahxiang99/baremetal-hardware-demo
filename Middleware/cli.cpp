@@ -7,21 +7,6 @@ void Cli::print_help() {
     setState(CliState::WaitingForInput);
 }
 
-void get_temp() {
-    constexpr uint32_t     DevAddr = 0x89;
-    const uint8_t          cmd     = 0xFD;
-    std::array<uint8_t, 6> raw_data;
-    raw_data.fill(0);
-    /* Test SHT40AD1B */
-    if (i2c1.Write(DevAddr, &cmd, 1, 3)) {
-        LOG_INFO("I2C Write IT Called.");
-        my_systick.delay_ms(30);
-        if (i2c1.Read(DevAddr, raw_data.data(), 6, 3)) {
-            LOG_INFO("I2C Read IT Called.");
-        }
-    }
-}
-
 void Cli::onUartData(const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         char c = static_cast<char>(data[i]);

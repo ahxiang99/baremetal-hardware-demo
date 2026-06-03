@@ -198,3 +198,16 @@ void InterruptI2C::disableInterruptFlag() {
 void InterruptI2C::onDataReceived(rxCallback cb) {
     dataCallback = cb;
 }
+bool InterruptI2C::isHardwareBusy(const uint32_t& Timeout) {
+    volatile uint32_t count = Timeout * 15999;
+    do {
+        count = count - 1;
+        if (count == 0U) {
+            return false;
+        }
+    } while (i2c_->SR2 & I2C_SR2_BUSY);
+    return true;
+}
+bool InterruptI2C::WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
+    return false;
+}

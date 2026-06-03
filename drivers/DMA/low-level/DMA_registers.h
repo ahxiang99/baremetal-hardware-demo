@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "low-level/rcc_registers.h"
+
 typedef struct {
     volatile uint32_t CR;    // Address Offset: 0x00
     volatile uint32_t NDTR;  // Address Offset: 0x04
@@ -13,11 +15,11 @@ typedef struct {
 } DMA_Stream_TypeDef;
 
 typedef struct {
-    volatile uint32_t           LISR;    // Address Offset: 0x00
-    volatile uint32_t           HISR;    // Address Offset: 0x04
-    volatile uint32_t           LIFCR;   // Address Offset: 0x08
-    volatile uint32_t           HIFCR;   // Address Offset: 0x0C
-    volatile DMA_Stream_TypeDef SMx[8];  // Address Offset: 0x10
+    volatile uint32_t  LISR;    // Address Offset: 0x00
+    volatile uint32_t  HISR;    // Address Offset: 0x04
+    volatile uint32_t  LIFCR;   // Address Offset: 0x08
+    volatile uint32_t  HIFCR;   // Address Offset: 0x0C
+    DMA_Stream_TypeDef SMx[8];  // Address Offset: 0x10
 } DMA_TypeDef;
 
 #define DMA1 ((DMA_TypeDef*)(AHB1PERIPH_BASE + 0x6000))

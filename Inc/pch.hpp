@@ -14,7 +14,6 @@
 #include <optional>
 #include <string_view>
 
-
 /* */
 
 /* Custom C++ Library */
@@ -23,3 +22,8 @@
 
 /* Custom C Library */
 #include "bit_utils.h"
+#include "cmsis.h"
+
+/* Define ConstantExpr*/
+constexpr size_t DMA_CHUNK_SIZE     = 128;
+constexpr size_t DMA_MAX_CHUNK_SIZE = 1024;

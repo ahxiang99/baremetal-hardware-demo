@@ -13,20 +13,11 @@ typedef enum { DMA_SM0, DMA_SM1, DMA_SM2, DMA_SM3, DMA_SM4, DMA_SM5, DMA_SM6, DM
 
 typedef enum { DMA_PERIPH_TO_MEMORY, DMA_MEMORY_TO_PERIPH, DMA_MEMORY_TO_MEMORY } DMA_Direction_t;
 
-typedef enum { HAL_UNLOCKED, HAL_LOCKED } HAL_LockTypeDef;
-
 typedef struct {
     DMA_Num_t       DMA_Num;
     DMA_CH_t        DMA_CH;
     DMA_SM_t        DMA_SM;
     DMA_Direction_t Direction;
 } DMA_InitTypeDef;
-
-typedef struct {
-    DMA_TypeDef*    Instance;
-    DMA_InitTypeDef Init;
-    HAL_LockTypeDef Lock;
-
-} DMA_HandleTypeDef;
 
 #endif

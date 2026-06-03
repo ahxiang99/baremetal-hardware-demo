@@ -5,7 +5,21 @@
 
 enum class I2C_State { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
 
-enum class I2C_Error { NONE, ERR_I2C_NULLPTR, ERR_I2C_TIMEOUT, ERR_I2C_AF, ERR_I2C_BUSY, ERR_I2C_SB, ERR_I2C_TXE, ERR_I2C_BTF, ERR_I2C_RXNE, ERR_I2C_BUS, ERR_I2C_ARLO, ERR_I2C_OVR };
+enum class I2C_Error {
+    NONE,
+    ERR_I2C_NULLPTR,
+    ERR_I2C_TIMEOUT,
+    ERR_I2C_AF,
+    ERR_I2C_BUSY,
+    ERR_I2C_SB,
+    ERR_I2C_TXE,
+    ERR_I2C_BTF,
+    ERR_I2C_RXNE,
+    ERR_I2C_BUS,
+    ERR_I2C_ARLO,
+    ERR_I2C_OVR,
+    ERR_I2C_DATA_EMPTY
+};
 
 enum class I2C_Clk_Freq { _100KHz, _400Khz };
 
@@ -43,8 +57,8 @@ class Stm32I2C : public II2C {
    protected:
     virtual void onPostI2CInit() {}
     virtual void Error_Handler();
-    bool         isHardwareBusy(const uint32_t& Timeout);
-    bool         WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
+    virtual bool isHardwareBusy(const uint32_t& Timeout);
+    virtual bool WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
 
     // Start, Stop Generation
     void generateStartCondition();
