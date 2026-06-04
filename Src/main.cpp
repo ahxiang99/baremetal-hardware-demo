@@ -35,6 +35,7 @@ Stm32GpioPin gpio_led;
 DmaUart      uart2;
 Stm32Timer   timer;
 DmaI2C       i2c1;
+Cli          cmd;
 Sht40ad1b    temp_sensor(i2c1, "SHT40");
 
 /* Function Prototype */
@@ -45,6 +46,7 @@ void RegisterCallback();
 int main() {
     Init_Driver();
     RegisterCallback();
+    cmd.setUart(&uart2);
 
     if (!timer.isRunning()) {
         timer.start(500);
@@ -54,6 +56,7 @@ int main() {
         i2c1.processRx();
         temp_sensor.ProcessData();
 #endif
+
 #if CLI_ENABLE
         uart2.processRx();
         if (cmd.getState() == CliState::WaitingForInput) {
@@ -102,11 +105,13 @@ void Init_Driver() {
     UartConfig uart2_cfg;
     uart2_cfg.dev_num  = UartNum::USART_D2;
     uart2_cfg.baudRate = UartBaudRate::_9600;
+
 #if CLI_ENABLE
     uart2_cfg.comm = UartComm::RX_TX;
 #else
     uart2_cfg.comm = UartComm::TX_ONLY;
 #endif
+
     uart2_cfg.parity   = UartParity::NONE;
     uart2_cfg.stopbits = UartStopBit::STOP_1;
 
@@ -159,15 +164,21 @@ void Init_Driver() {
 
 void RegisterCallback() {
 #if CLI_ENABLE
-    uart2.onDataReceived([&](const uint8_t* data, size_t len) { cmd.onUartData(data, len); });
+    uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
 #endif
 #if SENSOR_ENABLE
-    i2c1.onDataReceived([&]() {
-        if (temp_sensor.getState() == SensorState::WAIT_DATA) {
-            temp_sensor.setState(SensorState::DATA_READY);
-        }
-        // cmd.setState(CliState::WaitingForInput);
-    });
+    i2c1.onDataReceived(
+        [](void* ctx1, void* ctx2) {
+            auto* temp_sensor = static_cast<Sht40ad1b*>(ctx1);
+            if (temp_sensor->getState() == SensorState::WAIT_DATA) {
+                temp_sensor->setState(SensorState::DATA_READY);
+            }
+#if CLI_ENABLE
+            auto* cmd = static_cast<Cli*>(ctx1);
+            cmd->setState(CliState::WaitingForInput);
+#endif
+        },
+        &temp_sensor, &cmd);
 #endif
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 
@@ -11,11 +12,12 @@
 class DmaUart : public Stm32Uart {
    public:
     using Stm32Uart::Stm32Uart;
-    using RxCallback = std::function<void(const uint8_t* data, size_t len)>;
+    using RxCallbackFn = void (*)(void*, const uint8_t*, size_t);
+
     bool initialize() override;
     bool send(const uint8_t* pData, size_t Size) override;
 
-    void onDataReceived(RxCallback cb);
+    void onDataReceived(RxCallbackFn fn, void* ctx);
     void processRx();
 
     void handleInterrupt() override;
@@ -37,9 +39,11 @@ class DmaUart : public Stm32Uart {
 
     RingBuffer<uint8_t, DMA_MAX_CHUNK_SIZE> txBuffer;
     std::array<uint8_t, DMA_CHUNK_SIZE>     dmaTxBuffer;
-
     RingBuffer<uint8_t, DMA_CHUNK_SIZE>     rxBuffer;
-    RxCallback                              rxCallback         = nullptr;
+
+    RxCallbackFn                            rx_fn_             = nullptr;
+    void*                                   rx_ctx_            = nullptr;
+
     volatile bool                           rxEnabled          = false;
     volatile bool                           keyboardEventReady = false;
     void                                    enable_DMA_request();

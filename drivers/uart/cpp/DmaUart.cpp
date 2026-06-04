@@ -54,10 +54,13 @@ void DmaUart::initDmaTx() {
     hdmatx.initialize();
 
     /* Setup Transfer Completion Callback */
-    hdmatx.setXferCpltCallback([this]() {
-        this->tx_state_ = UartState::Ready;
-        this->startNextDmaTransfer();
-    });
+    hdmatx.setXferCpltCallback(
+        [](void* ctx) {
+            auto* self      = static_cast<DmaUart*>(ctx);
+            self->tx_state_ = UartState::Ready;
+            self->startNextDmaTransfer();
+        },
+        this);
 }
 
 void DmaUart::initDmaRx() {
@@ -75,10 +78,13 @@ void DmaUart::initDmaRx() {
     hdmarx.initialize();
 
     /* Setup Transfer Completion Callback */
-    hdmarx.setXferCpltCallback([this]() {
-        this->rxBuffer.sync_dma_head(hdmarx.getDmaStream()->NDTR);
-        this->startNextDmaReceive();
-    });
+    hdmarx.setXferCpltCallback(
+        [](void* ctx) {
+            auto* self = static_cast<DmaUart*>(ctx);
+            self->rxBuffer.sync_dma_head(self->hdmarx.getDmaStream()->NDTR);
+            self->startNextDmaReceive();
+        },
+        this);
 
     hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), DMA_CHUNK_SIZE);
 }
@@ -151,6 +157,8 @@ bool DmaUart::startNextDmaTransfer() {
 }
 
 bool DmaUart::startNextDmaReceive() {
+    if (!rxEnabled) return false;
+
     rx_state_ = UartState::BusyRx;
     if (!(uart_->CR1 & USART_CR1_IDLEIE)) {
         RegisterUtils::setBits(uart_->CR1, USART_CR1_IDLEIE);
@@ -167,7 +175,7 @@ void DmaUart::processRx() {
     }
     keyboardEventReady = false;
 
-    if (rxCallback) {
+    if (rx_fn_) {
         // Pop data from Rx Buffer and Send to Function.
         rxBuffer.sync_dma_head(DMA1->SMx[5].NDTR);
 
@@ -184,7 +192,7 @@ void DmaUart::processRx() {
                 transfer_buffer.at(i) = temp.value();
             }
         }
-        rxCallback(transfer_buffer.data(), transfer_size);
+        rx_fn_(rx_ctx_, transfer_buffer.data(), transfer_size);
     }
 }
 
@@ -205,6 +213,7 @@ void DmaUart::onRxInterrupt() {}
 void DmaUart::onIdleInterrupt() {
     keyboardEventReady = true;
 }
-void DmaUart::onDataReceived(RxCallback cb) {
-    rxCallback = cb;
+void DmaUart::onDataReceived(RxCallbackFn fn, void* ctx) {
+    rx_fn_  = fn;
+    rx_ctx_ = ctx;
 }

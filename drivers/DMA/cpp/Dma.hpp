@@ -21,16 +21,17 @@ struct DMA_Config {
 
 class IDma {
    public:
-    using dmaCallback = std::function<void()>;
-    void                setConfig(const DMA_Config& config);
-    void                StartDataStream(uint32_t Src, uint32_t Dst, uint32_t len);
-    bool                initialize();
-    void                handleInterrupt();
-    void                setXferCpltCallback(dmaCallback cb);
-    bool                is_Enabled() const;
-    void                Prepare(uint32_t Src, uint32_t Dst, uint32_t len);
-    void                enableStream();
-    void                disableStream();
+    void setConfig(const DMA_Config& config);
+    void StartDataStream(uint32_t Src, uint32_t Dst, uint32_t len);
+    bool initialize();
+    void handleInterrupt();
+    bool is_Enabled() const;
+    void Prepare(uint32_t Src, uint32_t Dst, uint32_t len);
+    void enableStream();
+    void disableStream();
+
+    using DmaCpltFn = void (*)(void*);
+    void                setXferCpltCallback(DmaCpltFn fn, void* ctx);
 
     DMA_Stream_TypeDef* getDmaStream() const;
 
@@ -62,5 +63,6 @@ class IDma {
     void clearFlag();
 
     /* Function Callback Ptr */
-    dmaCallback DmaXferCpltCallback = nullptr;
+    DmaCpltFn cplt_fn_  = nullptr;
+    void*     cplt_ctx_ = nullptr;
 };

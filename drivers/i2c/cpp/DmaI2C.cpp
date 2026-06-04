@@ -1,5 +1,6 @@
 #include "DmaI2C.hpp"
 
+#include <cstddef>
 #include <cstdint>
 
 #include "RegisterUtils.hpp"
@@ -38,10 +39,13 @@ void DmaI2C::initTxDma() {
     hdmatx.initialize();
 
     /* Setup Transfer Completion Callback */
-    hdmatx.setXferCpltCallback([this]() {
-        push_isr_event(I2C_IsrTag::TX_DMA_DONE);
-        this->dma_complete_ = true;
-    });
+    hdmatx.setXferCpltCallback(
+        [](void* ctx) {
+            auto* self = static_cast<DmaI2C*>(ctx);
+            self->push_isr_event(I2C_IsrTag::TX_DMA_DONE);
+            self->dma_complete_ = true;
+        },
+        this);
 }
 void DmaI2C::initRxDma() {
     DMA_Config config;
@@ -55,11 +59,14 @@ void DmaI2C::initRxDma() {
     hdmarx.initialize();
     RegisterUtils::clearBits(hdmarx.getDmaStream()->CR, DMA_SCR_CIRC);
     /* Setup Transfer Completion Callback */
-    hdmarx.setXferCpltCallback([this]() {
-        push_isr_event(I2C_IsrTag::RX_DMA_DONE);
-        this->RxEventFlag   = true;
-        this->dma_complete_ = true;
-    });
+    hdmarx.setXferCpltCallback(
+        [](void* ctx) {
+            auto* self = static_cast<DmaI2C*>(ctx);
+            self->push_isr_event(I2C_IsrTag::RX_DMA_DONE);
+            self->RxEventFlag   = true;
+            self->dma_complete_ = true;
+        },
+        this);
 }
 
 bool DmaI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) {
@@ -161,7 +168,7 @@ void DmaI2C::handleEVInterrupt() {
         if (snap == I2C_State::BUSY_RX && rxDmaPending_) {
             push_isr_event(I2C_IsrTag::EV_ADDR_RX, XferSize);
             rxDmaPending_ = false;
-            hdmarx.StartDataStream(reinterpret_cast<uint32_t>(&i2c_->DR), rxBuffer.data_ptr(), XferSize);
+            hdmarx.StartDataStream(reinterpret_cast<uint32_t>(&i2c_->DR), reinterpret_cast<uint32_t>(rxBuffer.data()), XferSize);
         } else {
             push_isr_event(I2C_IsrTag::EV_ADDR_TX);
             // TX path — DMA is already streaming, nothing to do here
@@ -247,21 +254,9 @@ bool DmaI2C::isHardwareBusy(const uint32_t& Timeout) {
 void DmaI2C::handleTxDmaInterrupt() {
     push_isr_event(I2C_IsrTag::TX_DMA_FIRED);
     hdmatx.handleInterrupt();
-    // const uint32_t sr = DMA1->HISR;
-    // if (sr & DMA_HISR_TCIF7) {
-    //     DMA1->HIFCR |= DMA_HIFCR_CTCIF7;
-    //     state_ = I2C_State::READY;
-    //     DMA1->SMx[7].CR &= ~DMA_SCR_EN;
-    //     startDmaTransfer();
-    // }
 }
 void DmaI2C::handleRxDmaInterrupt() {
     hdmarx.handleInterrupt();
-    // const uint32_t sr = DMA1->LISR;
-    // if (sr & DMA_LISR_TCIF0) {
-    //     DMA1->LIFCR |= DMA_LIFCR_CTCIF0;
-    //     rxBuffer.sync_dma_head(DMA1->SMx[0].NDTR);
-    // }
 }
 void DmaI2C::enable_DMA_request_tx() {
     /* Enable I2C DMA Request */
@@ -281,8 +276,10 @@ void DmaI2C::disableInterrupt() {
     constexpr uint32_t mask = I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN;
     RegisterUtils::clearBits(i2c_->CR2, mask);
 }
-void DmaI2C::onDataReceived(rxCallback cb) {
-    FuncPtr = cb;
+void DmaI2C::onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2) {
+    rx_fn_   = fn;
+    rx_ctx1_ = ctx1;
+    rx_ctx2_ = ctx2;
 }
 void DmaI2C::processRx() {
     drain_isr_log();
@@ -297,13 +294,10 @@ void DmaI2C::processRx() {
     }
 
     /* Update Rx Buffer Head */
-    rxBuffer.sync_dma_head(hdmarx.getDmaStream()->NDTR);
-    while (XferSize > 0) {
-        *XferPtr++ = rxBuffer.pop().value();
-        XferSize--;
+    for (size_t i = 0; i < XferSize; ++i) {
+        XferPtr[i] = rxBuffer[i];
     }
-
-    if (FuncPtr) FuncPtr();
+    if (rx_fn_) rx_fn_(rx_ctx1_, rx_ctx2_);
 }
 void DmaI2C::disable_DMA_request() {
     RegisterUtils::clearBits(i2c_->CR2, I2C_CR2_DMAEN | I2C_CR2_LAST);

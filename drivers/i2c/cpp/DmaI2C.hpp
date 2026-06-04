@@ -13,16 +13,11 @@ struct XferParams {
 };
 
 // Tags for the ISR-safe diagnostic log — written in ISR, consumed in processRx()
-enum class I2C_IsrTag : uint8_t {
-    EV_ENTRY, EV_SB, EV_ADDR_TX, EV_ADDR_RX,
-    EV_BTF_STOP, EV_BTF_STALL, EV_TXE,
-    ER_AF, ER_BERR, ER_ARLO, ER_OVR,
-    TX_DMA_FIRED, TX_DMA_DONE, RX_DMA_DONE
-};
+enum class I2C_IsrTag : uint8_t { EV_ENTRY, EV_SB, EV_ADDR_TX, EV_ADDR_RX, EV_BTF_STOP, EV_BTF_STALL, EV_TXE, ER_AF, ER_BERR, ER_ARLO, ER_OVR, TX_DMA_FIRED, TX_DMA_DONE, RX_DMA_DONE };
 
 class DmaI2C : public Stm32I2C {
    private:
-    using rxCallback = std::function<void()>;
+    using RxCallbackFn = void (*)(void*, void*);
 
    public:
     bool initialize() override;
@@ -32,7 +27,7 @@ class DmaI2C : public Stm32I2C {
     void handleERInterrupt() override;
     void handleTxDmaInterrupt();
     void handleRxDmaInterrupt();
-    void onDataReceived(rxCallback cb);
+    void onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2);
     void processRx();
 
    protected:
@@ -54,7 +49,7 @@ class DmaI2C : public Stm32I2C {
     void                                disableInterrupt();
 
     std::array<uint8_t, DMA_CHUNK_SIZE> dmaTxBuffer;
-    RingBuffer<uint8_t, DMA_CHUNK_SIZE> rxBuffer;
+    std::array<uint8_t, DMA_CHUNK_SIZE> rxBuffer;
 
     uint8_t                             DevAddr;
     uint8_t*                            XferPtr;
@@ -63,17 +58,23 @@ class DmaI2C : public Stm32I2C {
     volatile bool                       dma_complete_ = false;
     volatile bool                       rxDmaPending_ = false;
     /* Function Callback */
-    rxCallback FuncPtr = nullptr;
+    RxCallbackFn rx_fn_   = nullptr;
+    void*        rx_ctx1_ = nullptr;
+    void*        rx_ctx2_ = nullptr;
 
     // ISR-safe diagnostic log: push_isr_event() is safe to call from any ISR;
     // drain_isr_log() must only be called from the main loop (processRx).
     void push_isr_event(I2C_IsrTag tag, uint32_t a = 0, uint32_t b = 0);
     void drain_isr_log();
 #ifndef NDEBUG
-    struct IsrEvent { I2C_IsrTag tag; uint32_t a; uint32_t b; };
+    struct IsrEvent {
+        I2C_IsrTag tag;
+        uint32_t   a;
+        uint32_t   b;
+    };
     static constexpr size_t           kIsrLogSize   = 16;
-    std::array<IsrEvent, kIsrLogSize>  isr_log_      = {};
-    volatile uint8_t                   isr_log_head_ = 0;
-    uint8_t                            isr_log_tail_ = 0;
+    std::array<IsrEvent, kIsrLogSize> isr_log_      = {};
+    volatile uint8_t                  isr_log_head_ = 0;
+    uint8_t                           isr_log_tail_ = 0;
 #endif
 };

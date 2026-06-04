@@ -75,7 +75,7 @@ void IDma::handleInterrupt() {
         clearFlag();
         disableInterrupt();
         disableDMA();
-        if (DmaXferCpltCallback) DmaXferCpltCallback();
+        if (cplt_fn_) cplt_fn_(cplt_ctx_);
     }
 }
 
@@ -88,8 +88,9 @@ void IDma::setConfig(const DMA_Config& config) {
 void IDma::clearFlag() {
     RegisterUtils::setBits(*IFCR, 0x3F << streamIdx);
 }
-void IDma::setXferCpltCallback(dmaCallback cb) {
-    DmaXferCpltCallback = cb;
+void IDma::setXferCpltCallback(DmaCpltFn fn, void* ctx) {
+    cplt_fn_  = fn;
+    cplt_ctx_ = ctx;
 }
 bool IDma::is_Enabled() const {
     return Instance->CR & DMA_SCR_EN;

@@ -21,7 +21,7 @@ class RingBuffer {
         if (full) {
             tail = (tail + 1) & (BUF_SIZE - 1);
         }
-        head = head & (BUF_SIZE - 1);
+        head = (head + 1) & (BUF_SIZE - 1);
         full = (head == tail);
     }
 
@@ -29,7 +29,7 @@ class RingBuffer {
         if (empty()) return std::nullopt;
         T item = buf_data[tail];
         full   = false;
-        tail   = tail & (BUF_SIZE - 1);
+        tail   = (tail + 1) & (BUF_SIZE - 1);
         return item;
     }
 

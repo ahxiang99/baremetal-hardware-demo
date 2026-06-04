@@ -1,5 +1,7 @@
 #include "cli.hpp"
 
+#include <cstring>
+
 void Cli::print_help() {
     LOG_PRINT("Available Commands:");
     LOG_PRINT("help     : Show command list");
@@ -15,7 +17,7 @@ void Cli::onUartData(const uint8_t* data, size_t len) {
             case '\n':
                 if (lineBuffer.size() > 0) {
                     lineBuffer.push('\0');
-                    uart_.send(reinterpret_cast<const uint8_t*>(buf_newline.data()), buf_newline.size());
+                    uart_->send(reinterpret_cast<const uint8_t*>(buf_newline.data()), buf_newline.size());
                     executeCommand();
                 }
                 return;
@@ -23,12 +25,12 @@ void Cli::onUartData(const uint8_t* data, size_t len) {
             case 0x7F:
                 if (lineBuffer.size() > 0) {
                     lineBuffer.remove_last();
-                    uart_.send(reinterpret_cast<const uint8_t*>(buf_backspace.data()), buf_backspace.size());
+                    uart_->send(reinterpret_cast<const uint8_t*>(buf_backspace.data()), buf_backspace.size());
                 }
                 break;
             default:
-                lineBuffer.push(c);                                   // Push to buffer
-                uart_.send(reinterpret_cast<const uint8_t*>(&c), 1);  // Echo to the console
+                lineBuffer.push(c);                                    // Push to buffer
+                uart_->send(reinterpret_cast<const uint8_t*>(&c), 1);  // Echo to the console
         }
     }
 }
@@ -44,8 +46,8 @@ void Cli::executeCommand() {
 
     bool found = false;
     for (const auto& entry : cmd_table) {
-        if (std::strcmp(buffer.data(), entry.cmd_name.data()) == 0) {
-            entry.callBack();
+        if (entry.cmd_name && std::strcmp(entry.cmd_name, buffer.data()) == 0) {
+            entry.fn(entry.ctx);
             found = true;
             break;
         }
@@ -58,7 +60,7 @@ void Cli::executeCommand() {
 }
 
 void Cli::get_input() {
-    uart_.send(reinterpret_cast<const uint8_t*>(buf_input.data()), buf_input.size());
+    uart_->send(reinterpret_cast<const uint8_t*>(buf_input.data()), buf_input.size());
 }
 
 void Cli::echo() {
@@ -71,8 +73,8 @@ void Cli::echo() {
             transferBuffer.at(i) = temp.value();
         }
     }
-    uart_.send(transferBuffer.data(), transfer_length);
-    uart_.send(reinterpret_cast<const uint8_t*>(buf_newline.data()), buf_newline.size());
+    uart_->send(transferBuffer.data(), transfer_length);
+    uart_->send(reinterpret_cast<const uint8_t*>(buf_newline.data()), buf_newline.size());
     transferBuffer.fill(0);
     // Print >
     get_input();
