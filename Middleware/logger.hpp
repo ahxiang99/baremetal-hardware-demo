@@ -14,7 +14,6 @@
 #include "cpp/DmaUart.hpp"
 #include "cpp/IUart.hpp"
 #include "cpp/Stm32Uart.hpp"
-#include "cpp/uart.hpp"
 
 #ifdef NDEBUG
 #define LOG_DEBUG(fmt, ...) ((void)0)

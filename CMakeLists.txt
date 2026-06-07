@@ -47,6 +47,8 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
+
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
  
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
@@ -65,10 +67,6 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Sensor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/SHT4X.cpp
-
     # Middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/cli.cpp
 )
@@ -76,6 +74,7 @@ set(sources_SRCS
 # Include directories for all compilers
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
@@ -145,9 +144,9 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>: ${symbols_cxx_SYMB}>
     $<$<COMPILE_LANGUAGE:ASM>: ${symbols_asm_SYMB}>
 
-    # Configuration specific
+    # Config-specific optimization and debug info
     $<$<CONFIG:Debug>:DEBUG>
-    $<$<CONFIG:Release>: >
+    $<$<CONFIG:Release>:NDEBUG>
 )
 
 # Add linked libraries
@@ -161,7 +160,8 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -mfpu=fpv4-sp-d16
     -ffunction-sections
     -fdata-sections
-    -O0 # Keep optimization at zero to isolate register timing anomalies
+    $<$<CONFIG:Debug>:-O0 -g3>
+    $<$<CONFIG:Release>:-Os -g0>
 )
 
 target_link_options(${PROJECT_NAME} PRIVATE
@@ -182,6 +182,8 @@ add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.bin
+    # Strip debug symbols from ELF in Release only
+    COMMAND $<$<CONFIG:Release>:${CMAKE_STRIP}> $<$<CONFIG:Release>:--strip-debug> $<$<CONFIG:Release>:$<TARGET_FILE:${CMAKE_PROJECT_NAME}>>
 )
 
 

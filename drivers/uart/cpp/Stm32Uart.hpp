@@ -37,5 +37,4 @@ class Stm32Uart : public UartBase {
     void configureParity();
     void configureStopBits();
     void configureComm();
-    void configureGpio();
 };

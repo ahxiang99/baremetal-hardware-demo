@@ -18,10 +18,6 @@
 #include "cpp/systick.hpp"
 #include "logger.hpp"
 
-extern MySysTick              my_systick;
-
-extern DmaI2C                 i2c1;
-
 extern Sht40ad1b              temp_sensor;
 
 constexpr std::array<char, 3> buf_newline{"\r\n"};

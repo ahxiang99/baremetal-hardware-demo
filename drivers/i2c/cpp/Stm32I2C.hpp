@@ -81,7 +81,6 @@ class Stm32I2C : public II2C {
     void enablePeripheralClock();
 
     void configureI2C();
-    void configureGpio();
     void configurePeripheralFreq();
     void configureAddressingMode();
     void configureCCRandTrise();

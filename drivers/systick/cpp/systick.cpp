@@ -2,9 +2,8 @@
 
 #include <cstdint>
 
+#include "drivers.hpp"
 #include "low-level/nvic.h"
-
-extern MySysTick my_systick;
 
 MySysTick::MySysTick() {}
 
@@ -34,5 +33,5 @@ void MySysTick::delay_ms(uint32_t ms) const {
 }
 
 extern "C" void SysTick_Handler() {
-    my_systick.tick();
+    getDrivers().my_systick.tick();
 }

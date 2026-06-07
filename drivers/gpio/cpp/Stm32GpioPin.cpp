@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "IGpio.hpp"
-#include "RegisterUtils.hpp"
+#include "logger.hpp"
+#include "pch.hpp"
 
 struct GPIO_Port_Table {
     GPIO_TypeDef* instance;
@@ -20,9 +20,15 @@ static const GPIO_Port_Table gpio_table[static_cast<uint8_t>(GPIO_Port::GPIO_POR
     {GPIOH, RCC_AHB1ENR_GPIOH_EN, RCC_AHB1RSTR_GPIOH_RST},
 };
 
-bool Stm32GpioPin::Init() {
+bool Stm32GpioPin::Init(const GPIO_Config& config) {
+    config_ = config;
+    gpio_   = gpio_table[static_cast<uint8_t>(config_.port)].instance;
     enableGpioClock();
-    configurePin();
+    if (!configurePin()) {
+        LOG_ERROR("GPIO Init failed: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
+        return false;
+    }
+    LOG_INFO("GPIO Init Success: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
     return true;
 }
 
@@ -55,7 +61,8 @@ void Stm32GpioPin::enableGpioClock() {
     RegisterUtils::setBits(*enrReg, enableBit);
 }
 
-void Stm32GpioPin::configurePin() {
+bool Stm32GpioPin::configurePin() {
+    if (gpio_ == nullptr) return false;
     uint32_t temp = 0;
     for (auto i = 0; i < 16; ++i) {
         uint32_t pin_mask   = 1 << i;
@@ -63,7 +70,7 @@ void Stm32GpioPin::configurePin() {
 
         if (currentpin == pin_mask) {
             temp = gpio_->MODER;
-            RegisterUtils::clearBits(temp, (0x11 << 0) << (i * 2));
+            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
             RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.mode) << (i * 2));
             gpio_->MODER = temp;
 
@@ -73,12 +80,12 @@ void Stm32GpioPin::configurePin() {
             gpio_->OTYPER = temp;
 
             temp          = gpio_->OSPEEDR;
-            RegisterUtils::clearBits(temp, (0x11 << 0) << (i * 2));
+            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
             RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.ospdr) << (i * 2));
             gpio_->OSPEEDR = temp;
 
             temp           = gpio_->PUPDR;
-            RegisterUtils::clearBits(temp, (0x11 << 0) << (i * 2));
+            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
             RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.pupdr) << (i * 2));
             gpio_->PUPDR = temp;
 
@@ -88,8 +95,5 @@ void Stm32GpioPin::configurePin() {
             gpio_->AFR[i >> 3U] = temp;
         }
     }
-}
-void Stm32GpioPin::setVariable(GPIO_TypeDef* gpio, const GPIO_Config& config) {
-    gpio_   = gpio;
-    config_ = config;
+    return true;
 }

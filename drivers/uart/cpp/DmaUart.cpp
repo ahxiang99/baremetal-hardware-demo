@@ -10,7 +10,6 @@
 #include "cpp/IUart.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
-#include "low-level/uart.h"
 #include "low-level/uart_bitfields.h"
 #include "pch.hpp"
 

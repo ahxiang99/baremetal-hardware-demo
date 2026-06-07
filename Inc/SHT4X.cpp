@@ -7,10 +7,10 @@
 
 #include "Sensor.hpp"
 #include "bit_utils.h"
-#include "cpp/i2c.hpp"
 #include "cpp/systick.hpp"
 #include "logger.hpp"
 #include "low-level/i2c_bitfields.h"
+
 
 extern MySysTick timer;
 

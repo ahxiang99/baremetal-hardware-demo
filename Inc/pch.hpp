@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -14,16 +15,15 @@
 #include <optional>
 #include <string_view>
 
-/* */
+/* Define ConstantExpr */
+constexpr size_t DMA_CHUNK_SIZE     = 128;
+constexpr size_t DMA_MAX_CHUNK_SIZE = 1024;
 
 /* Custom C++ Library */
 #include "FloatIntExtraction.hpp"
+#include "Middleware/logger.hpp"
 #include "RegisterUtils.hpp"
 
 /* Custom C Library */
 #include "bit_utils.h"
 #include "cmsis.h"
-
-/* Define ConstantExpr*/
-constexpr size_t DMA_CHUNK_SIZE     = 128;
-constexpr size_t DMA_MAX_CHUNK_SIZE = 1024;

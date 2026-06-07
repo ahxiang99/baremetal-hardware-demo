@@ -10,9 +10,8 @@
 #include "Sensor.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/systick.hpp"
+#include "drivers.hpp"
 #include "logger.hpp"
-
-extern MySysTick my_systick;
 
 class Sht40ad1b {
    private:
@@ -39,14 +38,14 @@ class Sht40ad1b {
         if (m_State == SensorState::IDLE) {
             if (hi2c.Write(DevAddr, &cmd, 1, 3)) {
                 m_State            = SensorState::MEASURING;
-                measure_start_time = my_systick.get_ticks();
+                measure_start_time = getDrivers().my_systick.get_ticks();
             }
         }
     }
 
     void ProcessData() {
         if (m_State == SensorState::MEASURING) {
-            if ((my_systick.get_ticks() - measure_start_time) > 30) {
+            if ((getDrivers().my_systick.get_ticks() - measure_start_time) > 30) {
                 if (hi2c.Read(DevAddr, raw_data.data(), raw_data.size(), 3)) {
                     m_State = SensorState::WAIT_DATA;
                 } else {

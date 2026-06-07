@@ -5,9 +5,9 @@
 #include <cstddef>
 
 #include "RegisterUtils.hpp"
-#include "cpp/IGpio.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
+#include "drivers.hpp"
 #include "logger.hpp"
 #include "low-level/i2c_bitfields.h"
 #include "low-level/nvic.h"
@@ -231,7 +231,6 @@ bool Stm32I2C::initialize() {
         Error_Handler();
         return false;
     }
-    configureGpio();
     enablePeripheralClock();
     configureI2C();
     enableI2C();
@@ -327,8 +326,8 @@ void Stm32I2C::Error_Handler() {
 }
 
 bool Stm32I2C::isHardwareBusy(const uint32_t& Timeout) {
-    uint32_t tickStart = my_systick.get_ticks();
-    while ((my_systick.get_ticks() - tickStart) < Timeout) {
+    uint32_t tickStart = getDrivers().my_systick.get_ticks();
+    while ((getDrivers().my_systick.get_ticks() - tickStart) < Timeout) {
         if (!(i2c_->SR2 & I2C_SR2_BUSY)) {
             return false;
         }
@@ -337,8 +336,8 @@ bool Stm32I2C::isHardwareBusy(const uint32_t& Timeout) {
 }
 
 bool Stm32I2C::WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
-    uint32_t tickStart = my_systick.get_ticks();
-    while ((my_systick.get_ticks() - tickStart) < Timeout) {
+    uint32_t tickStart = getDrivers().my_systick.get_ticks();
+    while ((getDrivers().my_systick.get_ticks() - tickStart) < Timeout) {
         if (sr & mask) {
             return false;
         }
@@ -352,21 +351,6 @@ void Stm32I2C::clearAddrFlag() {
     (void)(temp);
 }
 
-void Stm32I2C::configureGpio() {
-    if (i2c_ == I2C1) {
-        GPIO_Config i2c_config;
-        i2c_config.port  = GPIO_Port::GPIO_PB;
-        i2c_config.pin   = GPIO_PIN_8 | GPIO_PIN_9;
-        i2c_config.mode  = GPIO_Moder::GPIO_MODE_ALTFN;
-        i2c_config.otype = GPIO_OType::GPIO_OTYPER_OD;
-        i2c_config.ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS;
-        i2c_config.afr   = GPIO_AFR::GPIO_AF4_I2C1_3;
-        i2c_config.pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP;
-
-        Stm32GpioPin i2c_io(GPIOB, i2c_config);
-        i2c_io.Init();
-    }
-}
 void Stm32I2C::generateStartCondition() {
     RegisterUtils::setBits(i2c_->CR1, I2C_CR1_START);
 }

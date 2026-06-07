@@ -7,7 +7,6 @@
 #include "RegisterUtils.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
-#include "low-level/uart.h"
 #include "low-level/uart_types.h"
 
 bool Stm32Uart::initialize() {
@@ -70,8 +69,6 @@ void Stm32Uart::configureStopBits() {
     }
     uart_->CR2 = temp;
 }
-
-void Stm32Uart::configureGpio() {}
 
 void Stm32Uart::enablePeripheralClock() {
     volatile uint32_t* enrReg    = nullptr;
