@@ -2,6 +2,11 @@
 
 #include <cstdint>
 
+#include "low-level/gpio_bitfields.h"
+#include "low-level/gpio_registers.h"
+#include "low-level/gpio_types.h"
+
+
 enum class GPIO_Port { GPIO_PA, GPIO_PB, GPIO_PC, GPIO_PD, GPIO_PE, GPIO_PH, GPIO_PORT_COUNT };
 
 enum class GPIO_State { LOW, HIGH };

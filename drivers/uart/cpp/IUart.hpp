@@ -4,7 +4,10 @@
 #include <cstdint>
 
 #include "../common/RegisterUtils.hpp"
-#include "low-level/uart.h"
+#include "low-level/uart_bitfields.h"
+#include "low-level/uart_registers.h"
+#include "low-level/uart_types.h"
+
 
 enum class UartState { Reset, Ready, BusyTx, BusyRx, Error };
 

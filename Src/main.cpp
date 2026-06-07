@@ -17,12 +17,8 @@
 #include "drivers/uart/cpp/DmaUart.hpp"
 #include "drivers/uart/cpp/InterruptUart.hpp"
 #include "drivers/uart/cpp/Stm32Uart.hpp"
-#include "low-level/gpio_registers.h"
-#include "low-level/gpio_types.h"
-#include "low-level/tim_registers.h"
-#include "low-level/tim_types.h"
-#include "low-level/uart_types.h"
 #include "pch.hpp"
+
 
 #define CLI_ENABLE 0
 #define SENSOR_ENABLE 1

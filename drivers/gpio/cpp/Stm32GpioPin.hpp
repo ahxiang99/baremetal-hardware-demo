@@ -1,7 +1,6 @@
 #pragma once
 
 #include "IGpio.hpp"
-#include "low-level/gpio.h"
 
 class Stm32GpioPin : public IGpio {
    private:
