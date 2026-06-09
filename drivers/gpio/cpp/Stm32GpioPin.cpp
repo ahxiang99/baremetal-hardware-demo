@@ -89,7 +89,7 @@ void Stm32GpioPin::configurePin() {
         }
     }
 }
-void Stm32GpioPin::setVariable(GPIO_TypeDef* gpio, const GPIO_Config& config) {
-    gpio_   = gpio;
+void Stm32GpioPin::configure(GPIO_TypeDef* gpio, const GPIO_Config& config) {
+    gpio_   = gpio_table[static_cast<uint32_t>(config.port)].instance;
     config_ = config;
 }

@@ -1,7 +1,8 @@
 #pragma once
 #include "II2C.hpp"
+#include "Result.hpp"
 #include "low-level/i2c_registers.h"
-#include "status.h"
+
 
 enum class I2C_State { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
 
@@ -79,7 +80,6 @@ class Stm32I2C : public II2C {
 
    private:
     void enablePeripheralClock();
-
     void configureI2C();
     void configureGpio();
     void configurePeripheralFreq();

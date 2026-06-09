@@ -10,7 +10,6 @@ extern "C" {
 #include "low-level/gpio_types.h"
 #include "rcc_bitfields.h"
 #include "rcc_registers.h"
-#include "status.h"
 
 void Init48MHzForUSB(void);
 #ifdef __cplusplus
