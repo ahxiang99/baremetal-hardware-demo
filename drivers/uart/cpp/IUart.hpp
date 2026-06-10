@@ -8,20 +8,19 @@
 #include "low-level/uart_registers.h"
 #include "low-level/uart_types.h"
 
+enum class UartState : uint8_t { Reset, Ready, BusyTx, BusyRx, Error };
 
-enum class UartState { Reset, Ready, BusyTx, BusyRx, Error };
+enum class UartError : uint8_t { None, Timeout, Framing, Overrun, Parity, InvalidConfig };
 
-enum class UartError { None, Timeout, Framing, Overrun, Parity, InvalidConfig };
+enum class UartNum : uint8_t { USART_D1, USART_D2, USART_D6, Dev_Total };
 
-enum class UartNum { USART_D1, USART_D2, USART_D6 };
+enum class UartBaudRate : uint32_t { _9600 = 0x683, _115200 = 0x008B };
 
-enum class UartBaudRate { _9600 = 0x683, _115200 = 0x008B };
+enum class UartComm : uint8_t { RX_ONLY, TX_ONLY, RX_TX };
 
-enum class UartComm { RX_ONLY, TX_ONLY, RX_TX };
+enum class UartParity : uint8_t { NONE, EVEN, ODD };
 
-enum class UartParity { NONE, EVEN, ODD };
-
-enum class UartStopBit { STOP_1, STOP_2 };
+enum class UartStopBit : uint8_t { STOP_1, STOP_2 };
 
 /* Constant Variables */
 

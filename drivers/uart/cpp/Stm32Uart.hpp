@@ -1,13 +1,14 @@
 #pragma once
 
+#include "IUart.hpp"
+#include "Result.hpp"
 #include "RingBuffer.hpp"
-#include "UartBase.hpp"
 
-class Stm32Uart : public UartBase {
+class Stm32Uart : public IUart {
    public:
     Stm32Uart() {}
-    Stm32Uart(USART_TypeDef* uart, const UartConfig& config) : uart_{uart}, config_{config} {}
-    void         setVariable(USART_TypeDef* uart, const UartConfig& config);
+    Stm32Uart(const UartConfig& config);
+    void         configure(const UartConfig& config);
     bool         initialize() override;
     bool         send(const uint8_t* data, size_t DataLength) override;
     bool         receive(uint8_t* buffer, size_t DataLength) override;
@@ -19,6 +20,9 @@ class Stm32Uart : public UartBase {
    protected:
     USART_TypeDef* uart_;
     UartConfig     config_;
+    UartState      tx_state_{UartState::Reset};
+    UartState      rx_state_{UartState::Reset};
+    UartError      error_{UartError::None};
     virtual void   onPostUartInit() {};
 
     void           clearFlag();
@@ -37,5 +41,4 @@ class Stm32Uart : public UartBase {
     void configureParity();
     void configureStopBits();
     void configureComm();
-    void configureGpio();
 };

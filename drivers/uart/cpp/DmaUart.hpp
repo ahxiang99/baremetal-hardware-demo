@@ -1,9 +1,9 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 
 #include "RingBuffer.hpp"
 #include "Stm32Uart.hpp"
@@ -11,10 +11,12 @@
 
 class DmaUart : public Stm32Uart {
    public:
-    using Stm32Uart::Stm32Uart;
+    DmaUart() {}
+
     using RxCallbackFn = void (*)(void*, const uint8_t*, size_t);
 
-    bool initialize() override;
+    void configure(const UartConfig& uart_cfg, const DMA_Config& txhdma_cfg,
+                   const DMA_Config& rxhdma_cfg);
     bool send(const uint8_t* pData, size_t Size) override;
 
     void onDataReceived(RxCallbackFn fn, void* ctx);
@@ -41,11 +43,11 @@ class DmaUart : public Stm32Uart {
     std::array<uint8_t, DMA_CHUNK_SIZE>     dmaTxBuffer;
     RingBuffer<uint8_t, DMA_CHUNK_SIZE>     rxBuffer;
 
-    RxCallbackFn                            rx_fn_             = nullptr;
-    void*                                   rx_ctx_            = nullptr;
+    RxCallbackFn                            rx_fn_    = nullptr;
+    void*                                   rx_ctx_   = nullptr;
 
-    volatile bool                           rxEnabled          = false;
-    volatile bool                           keyboardEventReady = false;
+    bool                                    rxEnabled = false;
+    std::atomic_bool                        keyboardEventReady{false};
     void                                    enable_DMA_request();
     void                                    disable_DMA_request();
     void                                    initDmaTx();

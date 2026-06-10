@@ -6,8 +6,26 @@
 #include "low-level/DMA_registers.h"
 #include "low-level/DMA_types.h"
 
-enum class DMA_Channel { Channel_0, Channel_1, Channel_2, Channel_3, Channel_4, Channel_5, Channel_6, Channel_7 };
-enum class DMA_Stream { Stream_0, Stream_1, Stream_2, Stream_3, Stream_4, Stream_5, Stream_6, Stream_7 };
+enum class DMA_Channel {
+    Channel_0,
+    Channel_1,
+    Channel_2,
+    Channel_3,
+    Channel_4,
+    Channel_5,
+    Channel_6,
+    Channel_7
+};
+enum class DMA_Stream {
+    Stream_0,
+    Stream_1,
+    Stream_2,
+    Stream_3,
+    Stream_4,
+    Stream_5,
+    Stream_6,
+    Stream_7
+};
 enum class DMA_Direction { DMA_PERIPH_TO_MEMORY, DMA_MEMORY_TO_PERIPH, DMA_MEMORY_TO_MEMORY };
 enum class DMA_Mode { Normal, Circular };
 
@@ -54,6 +72,8 @@ class IDma {
 
     void enableInterrupt();
     void disableInterrupt();
+
+    void enableISR();
 
     /* Configuration Function */
     void loadBuffer(uint8_t* pData, size_t len);

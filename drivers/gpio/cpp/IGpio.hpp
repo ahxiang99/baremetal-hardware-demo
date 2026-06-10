@@ -6,20 +6,19 @@
 #include "low-level/gpio_registers.h"
 #include "low-level/gpio_types.h"
 
+enum class GPIO_Port : uint8_t { GPIO_PA, GPIO_PB, GPIO_PC, GPIO_PD, GPIO_PE, GPIO_PH, GPIO_PORT_COUNT };
 
-enum class GPIO_Port { GPIO_PA, GPIO_PB, GPIO_PC, GPIO_PD, GPIO_PE, GPIO_PH, GPIO_PORT_COUNT };
+enum class GPIO_State : uint8_t { LOW, HIGH };
 
-enum class GPIO_State { LOW, HIGH };
+enum class GPIO_Moder : uint8_t { GPIO_MODE_INPUT = 0, GPIO_MODE_OUTPUT, GPIO_MODE_ALTFN, GPIO_MODE_ANALOG };
 
-enum class GPIO_Moder { GPIO_MODE_INPUT = 0, GPIO_MODE_OUTPUT, GPIO_MODE_ALTFN, GPIO_MODE_ANALOG };
+enum class GPIO_OType : uint8_t { GPIO_OTYPER_PP = 0, GPIO_OTYPER_OD };
 
-enum class GPIO_OType { GPIO_OTYPER_PP = 0, GPIO_OTYPER_OD };
+enum class GPIO_PUPDR : uint8_t { GPIO_PUPDR_NOPULL = 0, GPIO_PUPDR_PULLUP, GPIO_PUPDR_PULLDOWN };
 
-enum class GPIO_PUPDR { GPIO_PUPDR_NOPULL = 0, GPIO_PUPDR_PULLUP, GPIO_PUPDR_PULLDOWN };
+enum class GPIO_OSPDR : uint8_t { GPIO_OSPEEDR_LS = 0, GPIO_OSPEEDR_MS, GPIO_OSPEEDR_HS, GPIO_OSPEEDR_VHS };
 
-enum class GPIO_OSPDR { GPIO_OSPEEDR_LS = 0, GPIO_OSPEEDR_MS, GPIO_OSPEEDR_HS, GPIO_OSPEEDR_VHS };
-
-enum class GPIO_AFR {
+enum class GPIO_AFR : uint8_t {
     GPIO_AF0_SYSTEM    = 0,
     GPIO_AF1_TIM1_2    = 1,
     GPIO_AF2_TIM3_5    = 2,

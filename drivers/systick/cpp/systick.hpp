@@ -9,8 +9,8 @@
 
 class MySysTick {
    private:
-    constexpr static uint32_t SYSTICK_CLK_FREQ = 16000000;  // Assuming 16 MHz clock
-    volatile uint32_t         tickCount;
+    constexpr static uint32_t kSystickReload = (HSI_Freq_Hz / 1000U) - 1U;
+    std::atomic<uint32_t>     tickCount;
 
    public:
     MySysTick();

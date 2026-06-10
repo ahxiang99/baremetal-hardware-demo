@@ -208,6 +208,6 @@ bool InterruptI2C::isHardwareBusy(const uint32_t& Timeout) {
     } while (i2c_->SR2 & I2C_SR2_BUSY);
     return true;
 }
-bool InterruptI2C::WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
+bool InterruptI2C::WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
     return false;
 }

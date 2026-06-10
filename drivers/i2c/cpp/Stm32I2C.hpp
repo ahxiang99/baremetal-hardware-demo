@@ -1,12 +1,15 @@
 #pragma once
+#include <cstdint>
+
 #include "II2C.hpp"
 #include "Result.hpp"
+#include "cpp/IGpio.hpp"
 #include "low-level/i2c_registers.h"
 
 
-enum class I2C_State { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
+enum class I2C_State : uint8_t { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
 
-enum class I2C_Error {
+enum class I2C_Error : uint8_t {
     NONE,
     ERR_I2C_NULLPTR,
     ERR_I2C_TIMEOUT,
@@ -22,17 +25,19 @@ enum class I2C_Error {
     ERR_I2C_DATA_EMPTY
 };
 
-enum class I2C_Clk_Freq { _100KHz, _400Khz };
+enum class I2C_Dev : uint8_t { I2C_D1, I2C_D2, I2C_D3, I2C_Total };
 
-enum class I2C_Addressing_Mode { AddressMode_7Bit, AddressMode_10Bit };
+enum class I2C_Clk_Freq : uint8_t { _100KHz, _400Khz };
 
-enum class I2C_Mode { NONE, MASTER, SLAVE, MEM };
+enum class I2C_Addressing_Mode : uint8_t { AddressMode_7Bit, AddressMode_10Bit };
+
+enum class I2C_Mode : uint8_t { NONE, MASTER, SLAVE, MEM };
 
 struct I2C_Config {
+    I2C_Dev             Dev_Num;
     I2C_Clk_Freq        ClockFreq;
     uint32_t            OwnAddress1;
     I2C_Addressing_Mode AddressingMode;
-    uint32_t            DualAddressMode;
     uint32_t            OwnAddress2;
 };
 
@@ -47,8 +52,8 @@ class Stm32I2C : public II2C {
 
    public:
     Stm32I2C() {}
-    Stm32I2C(I2C_TypeDef* pInstance, const I2C_Config& Config) : i2c_(pInstance), config_(Config) {}
-    void setVariable(I2C_TypeDef* pInstance, const I2C_Config& Config);
+    Stm32I2C(const I2C_Config& Config);
+    void configure(const I2C_Config& Config);
     bool initialize() override;
     bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
     bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
@@ -59,7 +64,10 @@ class Stm32I2C : public II2C {
     virtual void onPostI2CInit() {}
     virtual void Error_Handler();
     virtual bool isHardwareBusy(const uint32_t& Timeout);
-    virtual bool WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
+    virtual bool WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask,
+                                    const uint32_t& Timeout);
+    void         recoverBus(GPIO_TypeDef* scl_port, uint32_t scl_pin, GPIO_TypeDef* sda_port,
+                            uint32_t sda_pin);
 
     // Start, Stop Generation
     void generateStartCondition();
@@ -81,11 +89,11 @@ class Stm32I2C : public II2C {
    private:
     void enablePeripheralClock();
     void configureI2C();
-    void configureGpio();
     void configurePeripheralFreq();
     void configureAddressingMode();
     void configureCCRandTrise();
 
-    bool WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint16_t Size,
+                           uint32_t Timeout);
     bool ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
 };

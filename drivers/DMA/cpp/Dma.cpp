@@ -4,6 +4,7 @@
 
 #include "RegisterUtils.hpp"
 #include "low-level/DMA_bitfields.h"
+#include "low-level/nvic.h"
 #include "low-level/rcc_bitfields.h"
 #include "pch.hpp"
 
@@ -33,7 +34,9 @@ void IDma::disableDMA() {
 bool IDma::initialize() {
     /* 1. Enable Clock First before perform configuration */
     enableDMAclock();
+    enableISR();
     configureDMA();
+
     return true;
 }
 
@@ -47,8 +50,9 @@ void IDma::configureDMA() {
     uint32_t temp = Instance->CR;
     uint32_t mask = DMA_SCR_EN | (3 << DMA_SCR_DIR_Pos);
     RegisterUtils::clearBits(temp, mask);
-    mask = (static_cast<uint8_t>(Config.Channel) << DMA_SCR_CHSEL_Pos) | (static_cast<uint8_t>(Config.Direction) << DMA_SCR_DIR_Pos) | (static_cast<uint8_t>(Config.Mode) << DMA_SCR_CIRC_Pos) |
-           DMA_SCR_MINC;
+    mask = (static_cast<uint8_t>(Config.Channel) << DMA_SCR_CHSEL_Pos) |
+           (static_cast<uint8_t>(Config.Direction) << DMA_SCR_DIR_Pos) |
+           (static_cast<uint8_t>(Config.Mode) << DMA_SCR_CIRC_Pos) | DMA_SCR_MINC;
     RegisterUtils::setBits(temp, mask);
     Instance->CR = temp;
 
@@ -60,7 +64,7 @@ void IDma::configureDMA() {
         IFCR = &Parent->HIFCR;
     }
     static const uint8_t flagBitshiftOffset[8U] = {0U, 6U, 16U, 22U, 0U, 6U, 16U, 22U};
-    streamIdx                                   = flagBitshiftOffset[static_cast<uint8_t>(Config.Stream)];
+    streamIdx = flagBitshiftOffset[static_cast<uint8_t>(Config.Stream)];
 }
 
 void IDma::loadBuffer(uint8_t* pData, size_t len) {
@@ -116,4 +120,61 @@ void IDma::enableStream() {
 }
 void IDma::disableStream() {
     disableDMA();
+}
+void IDma::enableISR() {
+    if (Parent == DMA1) {
+        switch (Config.Stream) {
+            case DMA_Stream::Stream_0:
+                My_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+                break;
+            case DMA_Stream::Stream_1:
+                My_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+                break;
+            case DMA_Stream::Stream_2:
+                My_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+                break;
+            case DMA_Stream::Stream_3:
+                My_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+                break;
+            case DMA_Stream::Stream_4:
+                My_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+                break;
+            case DMA_Stream::Stream_5:
+                My_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+                break;
+            case DMA_Stream::Stream_6:
+                My_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+                break;
+            case DMA_Stream::Stream_7:
+                My_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+                break;
+        }
+    } else {
+        switch (Config.Stream) {
+            case DMA_Stream::Stream_0:
+                My_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+                break;
+            case DMA_Stream::Stream_1:
+                My_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+                break;
+            case DMA_Stream::Stream_2:
+                My_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+                break;
+            case DMA_Stream::Stream_3:
+                My_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+                break;
+            case DMA_Stream::Stream_4:
+                My_NVIC_EnableIRQ(DMA2_Stream4_IRQn);
+                break;
+            case DMA_Stream::Stream_5:
+                My_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
+                break;
+            case DMA_Stream::Stream_6:
+                My_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+                break;
+            case DMA_Stream::Stream_7:
+                My_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+                break;
+        }
+    }
 }

@@ -1,14 +1,38 @@
 #include "Stm32Uart.hpp"
 
 #include <cstdint>
-#include <set>
 
 #include "IUart.hpp"
 #include "RegisterUtils.hpp"
+#include "drivers.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
-#include "low-level/uart.h"
+#include "low-level/rcc_bitfields.h"
+#include "low-level/uart_registers.h"
 #include "low-level/uart_types.h"
+
+constexpr uint32_t Timeout = 3U;
+
+struct uart_regs_table {
+    USART_TypeDef* instance;
+    uint32_t       enableBit;
+    uint32_t       disableBit;
+};
+
+static const uart_regs_table uart_table[static_cast<uint8_t>(UartNum::Dev_Total)] = {
+    {USART1, RCC_APB2ENR_USART1_EN, RCC_APB2RSTR_USART1_RST},
+    {USART2, RCC_APB1ENR_USART2_EN, RCC_APB1RSTR_USART2_RST},
+    {USART6, RCC_APB2ENR_USART6_EN, RCC_APB2RSTR_USART6_RST}
+};
+
+Stm32Uart::Stm32Uart(const UartConfig& config) : config_(config) {
+    uart_ = uart_table[static_cast<uint8_t>(config_.dev_num)].instance;
+}
+
+void Stm32Uart::configure(const UartConfig& config) {
+    config_ = config;
+    uart_   = uart_table[static_cast<uint8_t>(config_.dev_num)].instance;
+}
 
 bool Stm32Uart::initialize() {
     enablePeripheralClock();
@@ -21,8 +45,6 @@ bool Stm32Uart::initialize() {
 
     enablePeripheral();
     onPostUartInit();
-
-    My_NVIC_EnableIRQ(38);
     return true;
 }
 
@@ -34,6 +56,7 @@ void Stm32Uart::configureParity() {
     // Explicit Bit Cwnership
     constexpr uint32_t Mask = USART_CR1_PCE | USART_CR1_PS;
     uint32_t           temp = uart_->CR1;
+
     // Only Parity Bit are modified
     RegisterUtils::clearBits(temp, Mask);
 
@@ -48,7 +71,7 @@ void Stm32Uart::configureParity() {
             RegisterUtils::setBits(temp, Mask);
             break;
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
     uart_->CR1 = temp;
@@ -65,13 +88,11 @@ void Stm32Uart::configureStopBits() {
             RegisterUtils::setBits(temp, 0x10 << 12);
             break;
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
     uart_->CR2 = temp;
 }
-
-void Stm32Uart::configureGpio() {}
 
 void Stm32Uart::enablePeripheralClock() {
     volatile uint32_t* enrReg    = nullptr;
@@ -81,20 +102,23 @@ void Stm32Uart::enablePeripheralClock() {
         case UartNum::USART_D1: {
             enrReg    = &RCC->APB2ENR;
             enableBit = RCC_APB2ENR_USART1_EN;
+            My_NVIC_EnableIRQ(USART1_IRQn);
             break;
         }
         case UartNum::USART_D2: {
             enrReg    = &RCC->APB1ENR;
             enableBit = RCC_APB1ENR_USART2_EN;
+            My_NVIC_EnableIRQ(USART2_IRQn);
             break;
         }
         case UartNum::USART_D6: {
             enrReg    = &RCC->APB2ENR;
             enableBit = RCC_APB2ENR_USART6_EN;
+            My_NVIC_EnableIRQ(USART6_IRQn);
             break;
         }
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
 
@@ -125,7 +149,7 @@ void Stm32Uart::disablePeripheralClock() {
             break;
         }
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
     RegisterUtils::clearBits(*clrReg, clearBit);
@@ -149,6 +173,9 @@ void Stm32Uart::configureComm() {
             tx_state_ = UartState::Ready;
             rx_state_ = UartState::Ready;
             break;
+        default:
+            error_ = UartError::InvalidConfig;
+            return;
     }
     uart_->CR1 = temp;
 }
@@ -164,16 +191,29 @@ bool Stm32Uart::send(const uint8_t* data, size_t DataLength) {
     if (tx_state_ != UartState::Ready) {
         return false;
     }
-    tx_state_ = UartState::BusyTx;
+    tx_state_              = UartState::BusyTx;
 
+    uint32_t measure_start = 0;
     for (size_t i = 0; i < DataLength; ++i) {
-        while (!(uart_->SR & USART_SR_TXE));
+        measure_start = getDriver().my_systick.get_ticks();
+        while (!(uart_->SR & USART_SR_TXE)) {
+            if ((getDriver().my_systick.get_ticks() - measure_start) > Timeout) {
+                error_    = UartError::Timeout;
+                tx_state_ = UartState::Error;
+                return false;
+            }
+        }
         uart_->DR = data[i];
     }
-    while (!(uart_->SR & USART_SR_TC));
-
+    measure_start = getDriver().my_systick.get_ticks();
+    while (!(uart_->SR & USART_SR_TC)) {
+        if ((getDriver().my_systick.get_ticks() - measure_start) > Timeout) {
+            error_    = UartError::Timeout;
+            tx_state_ = UartState::Error;
+            return false;
+        }
+    }
     tx_state_ = UartState::Ready;
-
     return true;
 }
 bool Stm32Uart::receive(uint8_t* buffer, size_t DataLength) {
@@ -181,10 +221,18 @@ bool Stm32Uart::receive(uint8_t* buffer, size_t DataLength) {
         return false;
     }
 
-    rx_state_ = UartState::BusyRx;
+    rx_state_              = UartState::BusyRx;
 
+    uint32_t measure_start = 0;
     for (size_t i = 0; i < DataLength; ++i) {
-        while (!(uart_->SR & USART_SR_RXNE));
+        measure_start = getDriver().my_systick.get_ticks();
+        while (!(uart_->SR & USART_SR_RXNE)) {
+            if ((getDriver().my_systick.get_ticks() - measure_start) > Timeout) {
+                error_    = UartError::Timeout;
+                tx_state_ = UartState::Error;
+                return false;
+            }
+        }
         buffer[i] = uart_->DR;
     }
 
@@ -192,10 +240,6 @@ bool Stm32Uart::receive(uint8_t* buffer, size_t DataLength) {
     return true;
 }
 
-void Stm32Uart::setVariable(USART_TypeDef* uart, const UartConfig& config) {
-    uart_   = uart;
-    config_ = config;
-}
 void Stm32Uart::clearFlag() {
     volatile uint32_t temp;
     temp = uart_->SR;

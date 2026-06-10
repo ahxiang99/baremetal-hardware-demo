@@ -1,6 +1,6 @@
 BasedOnStyle: Google
 IndentWidth: 4
-ColumnLimit: 200
+ColumnLimit: 100
 AlignArrayOfStructures: Left
 AllowShortFunctionsOnASingleLine: Empty
 AlignConsecutiveDeclarations:

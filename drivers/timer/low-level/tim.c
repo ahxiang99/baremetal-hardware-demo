@@ -1,7 +1,9 @@
 #include "tim.h"
 
 #include "bit_utils.h"
-#include "low-level/gpio.h"
+#include "low-level/gpio_bitfields.h"
+#include "low-level/gpio_registers.h"
+#include "low-level/gpio_types.h"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
 #include "tim_bitfields.h"

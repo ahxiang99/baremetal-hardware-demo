@@ -48,5 +48,6 @@
 #define I2C_CR2_LAST (1 << 12)
 
 #define I2C_OAR1_ADDMODE (1 << 15)
+static constexpr uint32_t kI2C_CR2_FREQ_16MHz = 0x10U;
 
 #endif

@@ -14,7 +14,7 @@ class InterruptI2C : public Stm32I2C {
     uint32_t XferSize;
 
     bool     isHardwareBusy(const uint32_t& Timeout) override;
-    bool     WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) override;
+    bool     WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) override;
 
    public:
     using rxCallback = std::function<void()>;

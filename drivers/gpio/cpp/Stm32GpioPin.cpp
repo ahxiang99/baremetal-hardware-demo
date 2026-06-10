@@ -4,14 +4,10 @@
 
 #include "IGpio.hpp"
 #include "RegisterUtils.hpp"
+#include "drivers.hpp"
+#include "low-level/gpio_registers.h"
 
-struct GPIO_Port_Table {
-    GPIO_TypeDef* instance;
-    uint32_t      RCC_AHB1ENR_BIT;
-    uint32_t      RCC_AHB1RSTR_BIT;
-};
-
-static const GPIO_Port_Table gpio_table[static_cast<uint8_t>(GPIO_Port::GPIO_PORT_COUNT)] = {
+static const peripherals_regs_table<GPIO_TypeDef> gpio_table[static_cast<uint8_t>(GPIO_Port::GPIO_PORT_COUNT)] = {
     {GPIOA, RCC_AHB1ENR_GPIOA_EN, RCC_AHB1RSTR_GPIOA_RST},
     {GPIOB, RCC_AHB1ENR_GPIOB_EN, RCC_AHB1RSTR_GPIOB_RST},
     {GPIOC, RCC_AHB1ENR_GPIOC_EN, RCC_AHB1RSTR_GPIOC_RST},
@@ -50,9 +46,9 @@ void Stm32GpioPin::Toggle() {
 }
 
 void Stm32GpioPin::enableGpioClock() {
-    volatile uint32_t* enrReg    = &RCC->AHB1ENR;
-    uint32_t           enableBit = gpio_table[static_cast<uint8_t>(config_.port)].RCC_AHB1ENR_BIT;
-    RegisterUtils::setBits(*enrReg, enableBit);
+    volatile uint32_t* enrReg  = &RCC->AHB1ENR;
+    uint32_t           bitMask = gpio_table[static_cast<uint8_t>(config_.port)].enableBit;
+    RegisterUtils::setBits(*enrReg, bitMask);
 }
 
 void Stm32GpioPin::configurePin() {

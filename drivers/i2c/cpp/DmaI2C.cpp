@@ -6,6 +6,7 @@
 #include "RegisterUtils.hpp"
 #include "Stm32I2C.hpp"
 #include "cpp/Dma.hpp"
+#include "drivers.hpp"
 #include "logger.hpp"
 #include "low-level/DMA_bitfields.h"
 #include "low-level/i2c_bitfields.h"
@@ -75,6 +76,7 @@ bool DmaI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uin
     }
     if (isHardwareBusy(Timeout)) {
         error_ = I2C_Error::ERR_I2C_BUS;
+        Error_Handler();
         return false;
     }
 
@@ -98,7 +100,8 @@ bool DmaI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uin
         generateStartCondition();
     } else {
         enable_DMA_request_tx();
-        hdmatx.StartDataStream(reinterpret_cast<uint32_t>(dmaTxBuffer.data()), (uint32_t)&i2c_->DR, Size);
+        hdmatx.StartDataStream(reinterpret_cast<uint32_t>(dmaTxBuffer.data()), (uint32_t)&i2c_->DR,
+                               Size);
         /* Get Acknowledgement from Slave */
         enableInterrupt();
         generateStartCondition();
@@ -168,7 +171,8 @@ void DmaI2C::handleEVInterrupt() {
         if (snap == I2C_State::BUSY_RX && rxDmaPending_) {
             push_isr_event(I2C_IsrTag::EV_ADDR_RX, XferSize);
             rxDmaPending_ = false;
-            hdmarx.StartDataStream(reinterpret_cast<uint32_t>(&i2c_->DR), reinterpret_cast<uint32_t>(rxBuffer.data()), XferSize);
+            hdmarx.StartDataStream(reinterpret_cast<uint32_t>(&i2c_->DR),
+                                   reinterpret_cast<uint32_t>(rxBuffer.data()), XferSize);
         } else {
             push_isr_event(I2C_IsrTag::EV_ADDR_TX);
             // TX path — DMA is already streaming, nothing to do here
@@ -364,3 +368,23 @@ void DmaI2C::drain_isr_log() {
 void DmaI2C::push_isr_event(I2C_IsrTag, uint32_t, uint32_t) {}
 void DmaI2C::drain_isr_log() {}
 #endif
+void DmaI2C::Error_Handler() {
+    if (error_ == I2C_Error::ERR_I2C_BUS) {
+        /* Bus Stuck */
+        RegisterUtils::setBits(i2c_->CR1, I2C_CR1_SWRST);
+        /* Check again if bus busy is clear */
+        uint32_t start = getDriver().my_systick.get_ticks();
+        while (i2c_->SR2 & I2C_SR2_BUSY) {
+            if ((getDriver().my_systick.get_ticks() - start) > 3) {
+                error_ = I2C_Error::ERR_I2C_BUS;
+                state_ = I2C_State::BUSY;
+                mode_  = I2C_Mode::NONE;
+            }
+        }
+        RegisterUtils::clearBits(i2c_->CR1, I2C_CR1_SWRST);
+
+        error_ = I2C_Error::NONE;
+        state_ = I2C_State::READY;
+        mode_  = I2C_Mode::NONE;
+    }
+}

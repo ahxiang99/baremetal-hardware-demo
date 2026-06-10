@@ -86,3 +86,10 @@ CliState Cli::getState() const {
 void Cli::setState(CliState&& state) {
     state_ = state;
 }
+void Cli::cmd_get_temp() {
+    if (sensor_ == nullptr) {
+        LOG_WARN("No sensor attached.");
+        return;
+    }
+    sensor_->read();
+}

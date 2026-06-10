@@ -13,7 +13,22 @@ struct XferParams {
 };
 
 // Tags for the ISR-safe diagnostic log — written in ISR, consumed in processRx()
-enum class I2C_IsrTag : uint8_t { EV_ENTRY, EV_SB, EV_ADDR_TX, EV_ADDR_RX, EV_BTF_STOP, EV_BTF_STALL, EV_TXE, ER_AF, ER_BERR, ER_ARLO, ER_OVR, TX_DMA_FIRED, TX_DMA_DONE, RX_DMA_DONE };
+enum class I2C_IsrTag : uint8_t {
+    EV_ENTRY,
+    EV_SB,
+    EV_ADDR_TX,
+    EV_ADDR_RX,
+    EV_BTF_STOP,
+    EV_BTF_STALL,
+    EV_TXE,
+    ER_AF,
+    ER_BERR,
+    ER_ARLO,
+    ER_OVR,
+    TX_DMA_FIRED,
+    TX_DMA_DONE,
+    RX_DMA_DONE
+};
 
 class DmaI2C : public Stm32I2C {
    private:
@@ -57,6 +72,9 @@ class DmaI2C : public Stm32I2C {
     volatile bool                       RxEventFlag   = false;
     volatile bool                       dma_complete_ = false;
     volatile bool                       rxDmaPending_ = false;
+
+    void                                Error_Handler() override;
+
     /* Function Callback */
     RxCallbackFn rx_fn_   = nullptr;
     void*        rx_ctx1_ = nullptr;
