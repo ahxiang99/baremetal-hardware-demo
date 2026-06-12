@@ -1,11 +1,10 @@
 #pragma once
 #include "II2C.hpp"
 #include "low-level/i2c_registers.h"
-#include "status.h"
 
-enum class I2C_State { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
+enum class I2C_State : uint8_t { RESET, READY, BUSY, BUSY_TX, BUSY_RX, ABORT, TIMEOUT, ERROR };
 
-enum class I2C_Error {
+enum class I2C_Error : uint8_t {
     NONE,
     ERR_I2C_NULLPTR,
     ERR_I2C_TIMEOUT,
@@ -21,11 +20,11 @@ enum class I2C_Error {
     ERR_I2C_DATA_EMPTY
 };
 
-enum class I2C_Clk_Freq { _100KHz, _400Khz };
+enum class I2C_Clk_Freq : uint8_t { _100KHz, _400Khz };
 
-enum class I2C_Addressing_Mode { AddressMode_7Bit, AddressMode_10Bit };
+enum class I2C_Addressing_Mode : uint8_t { AddressMode_7Bit, AddressMode_10Bit };
 
-enum class I2C_Mode { NONE, MASTER, SLAVE, MEM };
+enum class I2C_Mode : uint8_t { NONE, MASTER, SLAVE, MEM };
 
 struct I2C_Config {
     I2C_Clk_Freq        ClockFreq;
@@ -58,7 +57,7 @@ class Stm32I2C : public II2C {
     virtual void onPostI2CInit() {}
     virtual void Error_Handler();
     virtual bool isHardwareBusy(const uint32_t& Timeout);
-    virtual bool WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
+    virtual bool WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
 
     // Start, Stop Generation
     void generateStartCondition();

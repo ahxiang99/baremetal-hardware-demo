@@ -1,30 +1,39 @@
 #include "DmaUart.hpp"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
-#include "IUart.hpp"
 #include "RegisterUtils.hpp"
 #include "Stm32Uart.hpp"
 #include "cpp/Dma.hpp"
-#include "cpp/IUart.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
 #include "low-level/uart_bitfields.h"
 #include "pch.hpp"
 
-void DmaUart::onPostUartInit() {
-    enable_DMA_request();
-    initDmaTx();
-    initDmaRx();
-    My_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-    My_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-    startNextDmaReceive();
+DmaUart::DmaUart() {}
+
+void DmaUart::configure(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg) {
+    Stm32Uart::configure(uart_cfg);
+    hdmatx.setConfig(txdma_cfg);
+    hdmarx.setConfig(rxdma_cfg);
 }
 
 bool DmaUart::initialize() {
-    if (!Stm32Uart::initialize()) return false;
+    if (!Stm32Uart::initialize()) {
+        return false;
+    }
+    onPostUartInit();
     return true;
+}
+
+void DmaUart::onPostUartInit() {
+    Stm32Uart::enableNVICInterrupt();
+    enable_DMA_request();
+    initDmaTx();
+    initDmaRx();
+    startNextDmaReceive();
 }
 
 bool DmaUart::send(const uint8_t* pData, size_t Size) {
@@ -41,15 +50,6 @@ bool DmaUart::send(const uint8_t* pData, size_t Size) {
 }
 
 void DmaUart::initDmaTx() {
-    /* This DMA Config is for USART2 Tx */
-    DMA_Config config;
-    config.DMA_BaseAddress = DMA1;
-    config.Channel         = DMA_Channel::Channel_4;
-    config.Stream          = DMA_Stream::Stream_6;
-    config.Direction       = DMA_Direction::DMA_MEMORY_TO_PERIPH;
-    config.Mode            = DMA_Mode::Normal;
-
-    hdmatx.setConfig(config);
     hdmatx.initialize();
 
     /* Setup Transfer Completion Callback */
@@ -64,16 +64,6 @@ void DmaUart::initDmaTx() {
 
 void DmaUart::initDmaRx() {
     if (!rxEnabled) return;
-
-    /* This DMA Config is for USART2 Rx */
-    DMA_Config config;
-    config.DMA_BaseAddress = DMA1;
-    config.Channel         = DMA_Channel::Channel_4;
-    config.Stream          = DMA_Stream::Stream_5;
-    config.Direction       = DMA_Direction::DMA_PERIPH_TO_MEMORY;
-    config.Mode            = DMA_Mode::Circular;
-
-    hdmarx.setConfig(config);
     hdmarx.initialize();
 
     /* Setup Transfer Completion Callback */
@@ -103,7 +93,7 @@ void DmaUart::enable_DMA_request() {
             rxEnabled = true;
             break;
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
 }
@@ -121,7 +111,7 @@ void DmaUart::disable_DMA_request() {
             RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAR);
             break;
         default:
-            SetError(UartError::InvalidConfig);
+            error_ = UartError::InvalidConfig;
             return;
     }
 }
@@ -169,14 +159,14 @@ bool DmaUart::startNextDmaReceive() {
 }
 
 void DmaUart::processRx() {
-    if (!keyboardEventReady) {
+    if (!keyboardEventReady.load(std::memory_order_acquire)) {
         return;
     }
-    keyboardEventReady = false;
+    keyboardEventReady.store(false, std::memory_order_relaxed);
 
     if (rx_fn_) {
         // Pop data from Rx Buffer and Send to Function.
-        rxBuffer.sync_dma_head(DMA1->SMx[5].NDTR);
+        rxBuffer.sync_dma_head(captured_ndtr_);
 
         size_t transfer_size = rxBuffer.size();
 
@@ -195,6 +185,10 @@ void DmaUart::processRx() {
     }
 }
 
+bool DmaUart::receive(uint8_t* pData, size_t Size) {
+    return false;
+}
+
 void DmaUart::handleInterrupt() {
     const uint32_t sr = uart_->SR;
     if (sr & USART_SR_IDLE) {
@@ -210,7 +204,8 @@ void DmaUart::onTxInterrupt() {}
 void DmaUart::onRxInterrupt() {}
 
 void DmaUart::onIdleInterrupt() {
-    keyboardEventReady = true;
+    captured_ndtr_ = static_cast<uint16_t>(hdmarx.getDmaStream()->NDTR);
+    keyboardEventReady.store(true, std::memory_order_release);
 }
 void DmaUart::onDataReceived(RxCallbackFn fn, void* ctx) {
     rx_fn_  = fn;

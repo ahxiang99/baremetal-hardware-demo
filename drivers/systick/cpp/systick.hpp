@@ -1,7 +1,4 @@
-#ifndef SYSTICK_HPP
-#define SYSTICK_HPP
-
-#include <sys/types.h>
+#pragma once
 
 #include <cstdint>
 
@@ -9,8 +6,7 @@
 
 class MySysTick {
    private:
-    constexpr static uint32_t SYSTICK_CLK_FREQ = 16000000;  // Assuming 16 MHz clock
-    volatile uint32_t         tickCount;
+    std::atomic<uint32_t> tickCount;
 
    public:
     MySysTick();
@@ -22,5 +18,3 @@ class MySysTick {
 };
 
 extern "C" void SysTick_Handler();
-
-#endif  // SYSTICK_HPP

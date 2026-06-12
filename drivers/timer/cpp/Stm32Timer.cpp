@@ -1,13 +1,6 @@
 #include "Stm32Timer.hpp"
 
-#include <stdlib.h>
-
-#include <memory>
-
-#include "ITimer.hpp"
-#include "RegisterUtils.hpp"
-#include "low-level/nvic.h"
-#include "low-level/tim_types.h"
+#include "pch.hpp"
 
 void Stm32Timer::start(uint32_t time_ms) {
     m_pTim->ARR = time_ms - 1;

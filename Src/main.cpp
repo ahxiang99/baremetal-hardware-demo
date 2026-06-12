@@ -1,7 +1,10 @@
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
-#include "Register.hpp"
+#include "Sht40ad1b.hpp"
+#include "cpp/Dma.hpp"
 #include "cpp/Stm32GpioPin.hpp"
+#include "cpp/UartConcepts.hpp"
+#include "cpp/UartRef.hpp"
 #include "drivers.hpp"
 #include "pch.hpp"
 
@@ -23,20 +26,28 @@ int main() {
     Drivers& g = getDrivers();
     Init_Driver(g);
     RegisterCallback();
-    cmd.setUart(&g.uart2);
 
     if (!g.timer.isRunning()) {
         g.timer.start(500);
     }
 
+    uint32_t measure_start = g.my_systick.get_ticks();
+
     while (1) {
 #if SENSOR_ENABLE
         g.i2c1.processRx();
         temp_sensor.ProcessData();
+
+        if (g.my_systick.get_ticks() - measure_start > 500) {
+            Packet<Sht40ad1b::SensorData> sensor_data(temp_sensor.getValue());
+            g.uart2.send(sensor_data.raw(), sensor_data.size());
+            measure_start = g.my_systick.get_ticks();
+        }
+
 #endif
 
 #if CLI_ENABLE
-        uart2.processRx();
+        g.uart2.processRx();
         if (cmd.getState() == CliState::WaitingForInput) {
             cmd.get_input();
             cmd.setState(CliState::Processing);
@@ -66,47 +77,53 @@ void Init_Driver(Drivers& g) {
     g.my_systick.init();
 
     /* Configure Uart2 Pin */
-    GPIO_Config uart2_gpio_cfg;
-    uart2_gpio_cfg.port  = GPIO_Port::GPIO_PA;
-    uart2_gpio_cfg.pin   = GPIO_PIN_2 | GPIO_PIN_3;
-    uart2_gpio_cfg.mode  = GPIO_Moder::GPIO_MODE_ALTFN;
-    uart2_gpio_cfg.ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS;
-    uart2_gpio_cfg.otype = GPIO_OType::GPIO_OTYPER_PP;
-    uart2_gpio_cfg.pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL;
-    uart2_gpio_cfg.afr   = GPIO_AFR::GPIO_AF7_USART1_2;
+    constexpr GPIO_Config uart2_gpio_cfg{.port  = GPIO_Port::GPIO_PA,
+                                         .pin   = GPIO_PIN_2 | GPIO_PIN_3,
+                                         .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
+                                         .otype = GPIO_OType::GPIO_OTYPER_PP,
+                                         .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+                                         .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
+                                         .afr   = GPIO_AFR::GPIO_AF7_USART1_2};
+
+    constexpr UartConfig  uart2_cfg{.dev_num  = UartNum::USART_D2,
+                                    .baudRate = UartBaudRate::_9600,
+#if CLI_ENABLE
+                                   .comm = UartComm::RX_TX,
+#else
+                                   .comm = UartComm::TX_ONLY,
+#endif
+                                   .parity   = UartParity::NONE,
+                                   .stopbits = UartStopBit::USART_CR2_STOP_1};
+
+    /* This DMA Config is for USART2 Tx */
+    const DMA_Config hdmatx_cfg{.DMA_BaseAddress = DMA1, .Stream = DMA_Stream::Stream_6, .Channel = DMA_Channel::Channel_4, .Direction = DMA_Direction::DMA_MEMORY_TO_PERIPH, .Mode = DMA_Mode::Normal};
+
+    /* This DMA Config is for USART2 Rx */
+    const DMA_Config hdmarx_cfg{
+        .DMA_BaseAddress = DMA1, .Stream = DMA_Stream::Stream_5, .Channel = DMA_Channel::Channel_4, .Direction = DMA_Direction::DMA_PERIPH_TO_MEMORY, .Mode = DMA_Mode::Circular};
 
     /* Configure i2c1 Pin */
-    GPIO_Config i2c1_gpio_config;
-    i2c1_gpio_config.port  = GPIO_Port::GPIO_PB;
-    i2c1_gpio_config.pin   = GPIO_PIN_8 | GPIO_PIN_9;
-    i2c1_gpio_config.mode  = GPIO_Moder::GPIO_MODE_ALTFN;
-    i2c1_gpio_config.otype = GPIO_OType::GPIO_OTYPER_OD;
-    i2c1_gpio_config.ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS;
-    i2c1_gpio_config.afr   = GPIO_AFR::GPIO_AF4_I2C1_3;
-    i2c1_gpio_config.pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP;
+    constexpr GPIO_Config i2c1_gpio_config{.port  = GPIO_Port::GPIO_PB,
+                                           .pin   = GPIO_PIN_8 | GPIO_PIN_9,
+                                           .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
+                                           .otype = GPIO_OType::GPIO_OTYPER_OD,
+                                           .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+                                           .pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP,
+                                           .afr   = GPIO_AFR::GPIO_AF4_I2C1_3
 
-    /* Configure Uart */
-    UartConfig uart2_cfg;
-    uart2_cfg.dev_num  = UartNum::USART_D2;
-    uart2_cfg.baudRate = UartBaudRate::_9600;
-#if CLI_ENABLE
-    uart2_cfg.comm = UartComm::RX_TX;
-#else
-    uart2_cfg.comm = UartComm::TX_ONLY;
-#endif
-    uart2_cfg.parity   = UartParity::NONE;
-    uart2_cfg.stopbits = UartStopBit::STOP_1;
-    g.uart2.setVariable(USART2, uart2_cfg);
-    g.uart2.initialize();
+    };
 
     /* Logger Init */
-    Logger::Init(g.uart2);
+    Logger::Init(UartRef::from(g.uart2));
     Logger::set_level(LogLevel::INFO);
 
     Stm32GpioPin temp;
     Startup(temp, uart2_gpio_cfg, i2c1_gpio_config);
+
+    /* Configure Uart */
+    g.uart2.configure(uart2_cfg, hdmatx_cfg, hdmarx_cfg);
+    g.uart2.initialize();
     LOG_INFO("Booting...");
-    LOG_INFO("System Initialized via IUart interface!");
     LOG_INFO("USART2 Initialized");
 
     I2C_Config i2c_config;
@@ -119,13 +136,13 @@ void Init_Driver(Drivers& g) {
     LOG_INFO("I2C1 Initialized");
 
     /* Blinking LED */
-    GPIO_Config gpio_led_cfg{.port  = GPIO_Port::GPIO_PA,
-                             .pin   = GPIO_PIN_5,
-                             .mode  = GPIO_Moder::GPIO_MODE_OUTPUT,
-                             .otype = GPIO_OType::GPIO_OTYPER_PP,
-                             .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_LS,
-                             .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
-                             .afr   = GPIO_AFR::GPIO_AF0_SYSTEM};
+    constexpr GPIO_Config gpio_led_cfg{.port  = GPIO_Port::GPIO_PA,
+                                       .pin   = GPIO_PIN_5,
+                                       .mode  = GPIO_Moder::GPIO_MODE_OUTPUT,
+                                       .otype = GPIO_OType::GPIO_OTYPER_PP,
+                                       .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_LS,
+                                       .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
+                                       .afr   = GPIO_AFR::GPIO_AF0_SYSTEM};
 
     g.gpio_led.Init(gpio_led_cfg);
 
@@ -142,17 +159,20 @@ void Init_Driver(Drivers& g) {
 
 void RegisterCallback() {
 #if CLI_ENABLE
-    uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
+    getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
+    cmd.setUart(UartRef::from(g.uart2));
+    cmd.setSensor(&temp_sensor);
 #endif
+
 #if SENSOR_ENABLE
     getDrivers().i2c1.onDataReceived(
         [](void* ctx1, void* ctx2) {
             auto* temp_sensor = static_cast<Sht40ad1b*>(ctx1);
-            if (temp_sensor->getState() == SensorState::WAIT_DATA) {
-                temp_sensor->setState(SensorState::DATA_READY);
+            if (temp_sensor->getState() == Sht40ad1b::SensorState::WAIT_DATA) {
+                temp_sensor->setState(Sht40ad1b::SensorState::DATA_READY);
             }
 #if CLI_ENABLE
-            auto* cmd = static_cast<Cli*>(ctx1);
+            auto* cmd = static_cast<Cli*>(ctx2);
             cmd->setState(CliState::WaitingForInput);
 #endif
         },

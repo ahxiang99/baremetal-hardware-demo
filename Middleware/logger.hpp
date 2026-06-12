@@ -3,28 +3,18 @@
 
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string_view>
+#include <utility>
 
 #include "../Middleware/RingBuffer.hpp"
 #include "FloatIntExtraction.hpp"
 #include "RingBuffer.hpp"
 #include "cpp/DmaUart.hpp"
-#include "cpp/IUart.hpp"
-#include "cpp/Stm32Uart.hpp"
-
-#ifdef NDEBUG
-#define LOG_DEBUG(fmt, ...) ((void)0)
-#else
-#define LOG_DEBUG(fmt, ...) Logger::Log(LogLevel::DBG, fmt, ##__VA_ARGS__)
-#endif
-
-#define LOG_INFO(fmt, ...) Logger::Log(LogLevel::INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) Logger::Log(LogLevel::WARN, fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...) Logger::Log(LogLevel::ERROR, fmt, ##__VA_ARGS__)
-#define LOG_PRINT(fmt, ...) Logger::Print(fmt, ##__VA_ARGS__)
+#include "cpp/UartRef.hpp"
 
 enum class LogLevel : uint8_t { DBG = 1, INFO, WARN, ERROR };
 
@@ -37,8 +27,8 @@ class Logger {
    public:
     Logger() = delete;  // No Constructor -> Logger to run as a Singleton.
 
-    static void Init(IUart& uart) {
-        get_uart_device() = &uart;
+    static void Init(UartRef device) {
+        get_uart_device() = device;
     }
 
     static void set_level(LogLevel level) {
@@ -72,9 +62,9 @@ class Logger {
         return current_level;
     }
 
-    static IUart*& get_uart_device() {
-        static IUart* uart = nullptr;
-        return uart;
+    static UartRef& get_uart_device() {
+        static UartRef uart_;
+        return uart_;
     }
 
     static void print_prefix(LogLevel& level) {
@@ -143,16 +133,22 @@ class Logger {
     }
 
     static void print_transport(const char* str) {
-        if (auto uart = get_uart_device()) {
-            uart->send(reinterpret_cast<const uint8_t*>(str), strlen(str));
-        }
+        get_uart_device().send(reinterpret_cast<const uint8_t*>(str), strlen(str));
     }
 
     static void print_transport(const std::string_view& str) {
-        if (auto uart = get_uart_device()) {
-            uart->send(reinterpret_cast<const uint8_t*>(str.data()), str.size());
-        }
+        get_uart_device().send(reinterpret_cast<const uint8_t*>(str.data()), str.size());
     }
 };
 
+#ifdef NDEBUG
+#define LOG_DEBUG(fmt, ...) ((void)0)
+#else
+#define LOG_DEBUG(fmt, ...) Logger::Log(LogLevel::DBG, fmt, ##__VA_ARGS__)
+#endif
+
+#define LOG_INFO(fmt, ...) Logger::Log(LogLevel::INFO, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) Logger::Log(LogLevel::WARN, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) Logger::Log(LogLevel::ERROR, fmt, ##__VA_ARGS__)
+#define LOG_PRINT(fmt, ...) Logger::Print(fmt, ##__VA_ARGS__)
 #endif

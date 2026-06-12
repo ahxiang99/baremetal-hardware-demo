@@ -10,12 +10,8 @@
 #include "drivers.hpp"
 #include "logger.hpp"
 #include "low-level/i2c_bitfields.h"
-#include "low-level/nvic.h"
 #include "low-level/rcc.h"
-
-constexpr uint32_t HSI_Freq = 16000000;
-
-#define I2C_CR2_16MHz (1 << 4)
+#include "pch.hpp"
 
 bool Stm32I2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) {
     return WriteTo7BitDevice(DevAddress, pData, Size, Timeout);
@@ -42,7 +38,7 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
         generateStartCondition();
 
         // Wait Start Bit
-        if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_SB, Timeout)) {
+        if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_SB, Timeout)) {
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_SB; /* Cannot generate start condition */
@@ -54,7 +50,7 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
         i2c_->DR = (DevAddress & ~0x1);
 
         // Wait Addr Bit
-        if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_ADDR, Timeout)) {
+        if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_ADDR, Timeout)) {
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_AF; /* Acknowledgment Failure */
@@ -67,7 +63,7 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
         // Transmit Data
         while (Size > 0U) {
             /* Wait TXE Flag Set */
-            if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_TXE, Timeout)) {
+            if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_TXE, Timeout)) {
                 state_ = I2C_State::READY;
                 mode_  = I2C_Mode::NONE;
                 error_ = I2C_Error::ERR_I2C_TXE;
@@ -82,7 +78,7 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
                 pData++;
                 Size--;
             }
-            if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
+            if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
                 state_ = I2C_State::READY;
                 mode_  = I2C_Mode::NONE;
                 error_ = I2C_Error::ERR_I2C_BTF;
@@ -120,9 +116,7 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
 
         /* Wait Start Bit */
 
-        // while (!(i2c_->SR1 & I2C_SR1_SB));
-
-        if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_SB, Timeout)) {
+        if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_SB, Timeout)) {
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_SB;
@@ -134,9 +128,7 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
 
         /* Wait Addr Flag */
 
-        // while (!(i2c_->SR1 & I2C_SR1_ADDR));
-
-        if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_ADDR, Timeout)) {
+        if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_ADDR, Timeout)) {
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_AF;
@@ -154,7 +146,7 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
         while (Size > 0U) {
             if (Size <= 3U) {
                 if (Size == 1) {
-                    if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_RXNE, Timeout)) {
+                    if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_RXNE, Timeout)) {
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_RXNE;
@@ -173,7 +165,7 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                     pData++;
                     Size--;
                 } else {
-                    if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
+                    if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_BTF;
@@ -185,7 +177,7 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                     pData++;
                     Size--;
 
-                    if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
+                    if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_BTF, Timeout)) {
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_BTF;
@@ -203,14 +195,13 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                     Size--;
                 }
             } else {
-                if (WaitOnFlagUntilTimeout(i2c_->SR1, I2C_SR1_RXNE, Timeout)) {
+                if (WaitForFlagTimeout(i2c_->SR1, I2C_SR1_RXNE, Timeout)) {
                     state_ = I2C_State::READY;
                     mode_  = I2C_Mode::NONE;
                     error_ = I2C_Error::ERR_I2C_RXNE;
                     Error_Handler();
                     return false;
                 }
-                // while (!(i2c_->SR1 & I2C_SR1_RXNE));
                 *pData = i2c_->DR;
                 pData++;
                 Size--;
@@ -311,11 +302,11 @@ void Stm32I2C::configureCCRandTrise() {
             SCL_Freq = 400000;
             break;
     }
-    uint32_t CCR = HSI_Freq / (2 * SCL_Freq);
+    uint32_t CCR = HSI_Freq_Hz / (2 * SCL_Freq);
     RegisterUtils::setBits(i2c_->CCR, CCR);
 
     /* Configure Trise */
-    uint32_t Trise = HSI_Freq / 1000000 + 1;
+    uint32_t Trise = HSI_Freq_Hz / 1000000 + 1;
     RegisterUtils::setBits(i2c_->TRISE, Trise);
 }
 
@@ -335,7 +326,7 @@ bool Stm32I2C::isHardwareBusy(const uint32_t& Timeout) {
     return true;
 }
 
-bool Stm32I2C::WaitOnFlagUntilTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
+bool Stm32I2C::WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout) {
     uint32_t tickStart = getDrivers().my_systick.get_ticks();
     while ((getDrivers().my_systick.get_ticks() - tickStart) < Timeout) {
         if (sr & mask) {

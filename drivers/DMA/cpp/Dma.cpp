@@ -34,6 +34,7 @@ bool IDma::initialize() {
     /* 1. Enable Clock First before perform configuration */
     enableDMAclock();
     configureDMA();
+    enableISR();
     return true;
 }
 
@@ -116,4 +117,61 @@ void IDma::enableStream() {
 }
 void IDma::disableStream() {
     disableDMA();
+}
+void IDma::enableISR() {
+    if (Parent == DMA1) {
+        switch (Config.Stream) {
+            case DMA_Stream::Stream_0:
+                My_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+                break;
+            case DMA_Stream::Stream_1:
+                My_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+                break;
+            case DMA_Stream::Stream_2:
+                My_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+                break;
+            case DMA_Stream::Stream_3:
+                My_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+                break;
+            case DMA_Stream::Stream_4:
+                My_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+                break;
+            case DMA_Stream::Stream_5:
+                My_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+                break;
+            case DMA_Stream::Stream_6:
+                My_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+                break;
+            case DMA_Stream::Stream_7:
+                My_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+                break;
+        }
+    } else {
+        switch (Config.Stream) {
+            case DMA_Stream::Stream_0:
+                My_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+                break;
+            case DMA_Stream::Stream_1:
+                My_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+                break;
+            case DMA_Stream::Stream_2:
+                My_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+                break;
+            case DMA_Stream::Stream_3:
+                My_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+                break;
+            case DMA_Stream::Stream_4:
+                My_NVIC_EnableIRQ(DMA2_Stream4_IRQn);
+                break;
+            case DMA_Stream::Stream_5:
+                My_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
+                break;
+            case DMA_Stream::Stream_6:
+                My_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+                break;
+            case DMA_Stream::Stream_7:
+                My_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+                break;
+        }
+    }
 }

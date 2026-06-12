@@ -61,14 +61,12 @@ set(sources_SRCS
     
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/low-level/tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
-    # Middleware
-    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/cli.cpp
+
 )
 
 # Include directories for all compilers

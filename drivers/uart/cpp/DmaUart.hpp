@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -10,27 +11,30 @@
 #include "cpp/Dma.hpp"
 
 class DmaUart : public Stm32Uart {
-   public:
-    using Stm32Uart::Stm32Uart;
     using RxCallbackFn = void (*)(void*, const uint8_t*, size_t);
 
-    bool initialize() override;
-    bool send(const uint8_t* pData, size_t Size) override;
+   public:
+    DmaUart();
+    void configure(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg);
+    bool initialize();
+
+    bool send(const uint8_t* pData, size_t Size);
+    bool receive(uint8_t* pData, size_t Size);
 
     void onDataReceived(RxCallbackFn fn, void* ctx);
     void processRx();
 
-    void handleInterrupt() override;
-    void handleTxDmaInterrupt() override;
-    void handleRxDmaInterrupt() override;
+    void handleInterrupt();
+    void handleTxDmaInterrupt();
+    void handleRxDmaInterrupt();
 
    protected:
     // Interupt Handler
-    void onPostUartInit() override;
+    void onPostUartInit();
 
-    void onTxInterrupt() override;
-    void onRxInterrupt() override;
-    void onIdleInterrupt() override;
+    void onTxInterrupt();
+    void onRxInterrupt();
+    void onIdleInterrupt();
 
    private:
     // DMA Handler
@@ -41,11 +45,12 @@ class DmaUart : public Stm32Uart {
     std::array<uint8_t, DMA_CHUNK_SIZE>     dmaTxBuffer;
     RingBuffer<uint8_t, DMA_CHUNK_SIZE>     rxBuffer;
 
-    RxCallbackFn                            rx_fn_             = nullptr;
-    void*                                   rx_ctx_            = nullptr;
+    RxCallbackFn                            rx_fn_    = nullptr;
+    void*                                   rx_ctx_   = nullptr;
 
-    volatile bool                           rxEnabled          = false;
-    volatile bool                           keyboardEventReady = false;
+    bool                                    rxEnabled = false;
+    std::atomic_bool                        keyboardEventReady{false};
+    volatile uint16_t                       captured_ndtr_{0};
     void                                    enable_DMA_request();
     void                                    disable_DMA_request();
     void                                    initDmaTx();

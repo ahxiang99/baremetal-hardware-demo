@@ -6,10 +6,10 @@
 #include "low-level/DMA_registers.h"
 #include "low-level/DMA_types.h"
 
-enum class DMA_Channel { Channel_0, Channel_1, Channel_2, Channel_3, Channel_4, Channel_5, Channel_6, Channel_7 };
-enum class DMA_Stream { Stream_0, Stream_1, Stream_2, Stream_3, Stream_4, Stream_5, Stream_6, Stream_7 };
-enum class DMA_Direction { DMA_PERIPH_TO_MEMORY, DMA_MEMORY_TO_PERIPH, DMA_MEMORY_TO_MEMORY };
-enum class DMA_Mode { Normal, Circular };
+enum class DMA_Channel : uint8_t { Channel_0, Channel_1, Channel_2, Channel_3, Channel_4, Channel_5, Channel_6, Channel_7 };
+enum class DMA_Stream : uint8_t { Stream_0, Stream_1, Stream_2, Stream_3, Stream_4, Stream_5, Stream_6, Stream_7 };
+enum class DMA_Direction : uint8_t { DMA_PERIPH_TO_MEMORY, DMA_MEMORY_TO_PERIPH, DMA_MEMORY_TO_MEMORY };
+enum class DMA_Mode : uint8_t { Normal, Circular };
 
 struct DMA_Config {
     DMA_TypeDef*  DMA_BaseAddress;
@@ -48,6 +48,7 @@ class IDma {
     std::array<uint8_t, DMA_CHUNK_SIZE> dmaTxBuffer;
     /* Enable or Disable Function*/
     void enableDMAclock();
+    void enableISR();
 
     void enableDMA();
     void disableDMA();
