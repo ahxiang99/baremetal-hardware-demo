@@ -60,3 +60,36 @@ class RingBuffer {
         head = head - 1;
     }
 };
+
+template <typename T, size_t SIZE>
+class SpscRingBuffer {
+    static_assert((SIZE & (SIZE - 1)) == 0, "SIZE must be power of two");
+    std::array<T, SIZE> buffer_;
+    std::atomic<size_t> head_{0};  // write index — ISR owns
+    std::atomic<size_t> tail_{0};  // read index — main owns
+
+   public:
+    bool push(const T& val) {
+        size_t head = head_.load(std::memory_order_relaxed);
+        size_t tail = tail_.load(std::memory_order_acquire);
+        if (head - tail == SIZE) return false;
+
+        buffer_[head & (SIZE - 1)] = val;
+        head_.store(head + 1, std::memory_order_release);
+        return true;
+    }
+
+    bool pop(T& out) {
+        size_t head = head_.load(std::memory_order_acquire);
+        size_t tail = tail_.load(std::memory_order_relaxed);
+
+        if (head - tail == 0) return false;
+        out = buffer_[tail & (SIZE - 1)];
+        tail_.store(tail + 1, std::memory_order_release);
+        return true;
+    }
+
+    uintptr_t data_ptr() const {
+        return reinterpret_cast<uintptr_t>(buffer_.data());
+    }
+};

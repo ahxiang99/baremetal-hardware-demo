@@ -15,3 +15,10 @@ struct Drivers {
 };
 
 Drivers& getDrivers();
+
+template <typename T>
+struct peripherals_regs_table {
+    T*       instance;
+    uint32_t enableBit;
+    uint32_t resetBit;
+};

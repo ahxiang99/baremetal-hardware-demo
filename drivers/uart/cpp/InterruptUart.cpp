@@ -3,15 +3,30 @@
 #include <atomic>
 
 #include "RegisterUtils.hpp"
+#include "Stm32Uart.hpp"
 #include "cpp/Stm32Uart.hpp"
-#include "low-level/nvic.h"
-#include "low-level/uart_bitfields.h"
+#include "drivers.hpp"
+#include "pch.hpp"
 
-bool InterruptUart::initialize() {
-    if (!Stm32Uart::initialize()) {
-        return false;
+Result<bool, UartInitError> InterruptUart::initialize() {
+    // 1. check uart_ not null
+    if (uart_ == nullptr) {
+        return Result<bool, UartInitError>::fail(UartInitError::NullPeripheral);
     }
-    return onPostUartInit();
+    // 2. check already initialised
+    if (m_Init) {
+        return Result<bool, UartInitError>::fail(UartInitError::AlreadyInitialised);
+    }
+    // 3. call Stm32Uart::initialize()
+    if (Stm32Uart::initialize()) {
+        // 4. call onPostInit()
+        if (!onPostUartInit()) {
+            return Result<bool, UartInitError>::fail(UartInitError::InvalidPostInit);
+        }
+        return Result<bool, UartInitError>::success(true);
+    }
+    // return success or specific error
+    return Result<bool, UartInitError>::fail(UartInitError::InvalidConfig);
 }
 
 bool InterruptUart::onPostUartInit() {
@@ -37,6 +52,12 @@ bool InterruptUart::receive(uint8_t* data, size_t DataLength) {
     }
     RxDataPtr    = data;
     XferDataSize = DataLength;
+    if (rx_state_ == UartState::Error) {
+        // Call Recovery
+        RxBuffer  = {};
+        rx_state_ = UartState::Ready;
+        error_    = UartError::None;
+    }
     start_receive();
     return true;
 }
@@ -103,17 +124,24 @@ void InterruptUart::processRx() {
     if (!rxEventFlag.load(std::memory_order_acquire)) {
         return;
     }
+
     rxEventFlag.store(false, std::memory_order_relaxed);
 
     if (dataCallback) {
         // Pop data from Rx Buffer and Send to Function.
 
-        size_t transfer_size = RxBuffer.size() > TXRX_CHUNK_SIZE ? TXRX_CHUNK_SIZE : RxBuffer.size();
+        size_t transfer_size = RxBuffer.size() > CHUNK_SIZE ? CHUNK_SIZE : RxBuffer.size();
 
         for (size_t i = 0; i < transfer_size; ++i) {
             auto byte = RxBuffer.pop();
             if (byte.has_value() && RxDataPtr) RxDataPtr[i] = byte.value();
         }
         dataCallback(RxDataPtr, transfer_size);
+    }
+}
+void InterruptUart::recoverTx() {
+    if (tx_state_ == UartState::BusyTx && !TxBuffer.empty()) {
+        // TXEIE may have been lost — re-enable it
+        RegisterUtils::setBits(uart_->CR1, USART_CR1_TXEIE);
     }
 }

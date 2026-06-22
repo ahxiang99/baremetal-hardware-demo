@@ -18,7 +18,7 @@ enum class GPIO_PUPDR : uint8_t { GPIO_PUPDR_NOPULL = 0, GPIO_PUPDR_PULLUP, GPIO
 
 enum class GPIO_OSPDR : uint8_t { GPIO_OSPEEDR_LS = 0, GPIO_OSPEEDR_MS, GPIO_OSPEEDR_HS, GPIO_OSPEEDR_VHS };
 
-enum class GPIO_AFR {
+enum class GPIO_AFR : uint8_t {
     GPIO_AF0_SYSTEM    = 0,
     GPIO_AF1_TIM1_2    = 1,
     GPIO_AF2_TIM3_5    = 2,
@@ -35,8 +35,8 @@ enum class GPIO_AFR {
 };
 
 struct GPIO_Config {
-    GPIO_Port  port;
     uint32_t   pin;
+    GPIO_Port  port;
     GPIO_Moder mode;
     GPIO_OType otype;
     GPIO_OSPDR ospdr;

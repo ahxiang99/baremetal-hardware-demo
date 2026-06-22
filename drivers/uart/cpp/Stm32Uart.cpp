@@ -8,15 +8,7 @@
 #include "low-level/rcc.h"
 #include "low-level/uart_types.h"
 
-constexpr uint32_t Timeout = 0x10U;
-
-struct uart_regs_table {
-    USART_TypeDef* instance;
-    uint32_t       enableBit;
-    uint32_t       disableBit;
-};
-
-static const uart_regs_table uart_table[static_cast<uint8_t>(UartNum::Dev_Total)] = {
+static const peripherals_regs_table<USART_TypeDef> uart_table[static_cast<uint8_t>(UartNum::Dev_Total)] = {
     {USART1, RCC_APB2ENR_USART1_EN, RCC_APB2RSTR_USART1_RST},
     {USART2, RCC_APB1ENR_USART2_EN, RCC_APB1RSTR_USART2_RST},
     {USART6, RCC_APB2ENR_USART6_EN, RCC_APB2RSTR_USART6_RST}
@@ -31,13 +23,12 @@ Stm32Uart::Stm32Uart(const UartConfig& config) : config_(config) {
 bool Stm32Uart::initialize() {
     enablePeripheralClock();
     disablePeripheral();
-
     configureComm();
     configureBaudRate();
     configureParity();
     configureStopBits();
-
     enablePeripheral();
+    m_Init = true;
     return true;
 }
 

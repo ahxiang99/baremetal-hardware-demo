@@ -1,14 +1,27 @@
 #include "InterruptI2C.hpp"
 
+#include <atomic>
+
 #include "Stm32I2C.hpp"
 #include "low-level/i2c_bitfields.h"
 #include "pch.hpp"
 
 bool InterruptI2C::initialize() {
+    // 1. check uart_ not null
+    // 2. check already initialised
+    // 3. call Stm32Uart::initialize()
+    // 4. call onPostInit()
+    // return success or specific error
+
     if (!Stm32I2C::initialize()) {
         return false;
     }
+    onPostI2CInit();
     return true;
+}
+
+void InterruptI2C::onPostI2CInit() {
+    Stm32I2C::enableNVICInterrupt();
 }
 
 bool InterruptI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) {
@@ -22,16 +35,15 @@ bool InterruptI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Siz
         mode_    = I2C_Mode::MASTER;
         error_   = I2C_Error::NONE;
 
-        DevAddr  = std::move(DevAddress);
-        XferSize = std::move(Size);
+        DevAddr  = DevAddress;
+        XferSize = Size;
 
         for (size_t i = 0; i < Size; ++i) {
-            TxBuffer.push(std::move(pData[i]));
+            TxBuffer.push(pData[i]);
         }
 
         generateStartCondition();
         enableInterruptFlag();
-
         return true;
     } else {
         return false;
@@ -49,9 +61,9 @@ bool InterruptI2C::Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint
         mode_    = I2C_Mode::MASTER;
         error_   = I2C_Error::NONE;
 
-        DevAddr  = std::move(DevAddress);
+        DevAddr  = DevAddress;
         XferPtr  = pData;
-        XferSize = std::move(Size);
+        XferSize = Size;
 
         enableAckBit();
 
@@ -67,8 +79,8 @@ bool InterruptI2C::Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint
 }
 
 void InterruptI2C::processRx() {
-    if (RxEventFlag) {
-        RxEventFlag = false;
+    if (RxEventFlag.load(std::memory_order_acquire)) {
+        RxEventFlag.store(false, std::memory_order_relaxed);
 
         while (RxBuffer.size() > 0) {
             *XferPtr++ = RxBuffer.pop().value();
@@ -91,7 +103,7 @@ void InterruptI2C::handleEVInterrupt() {
         } else {
             state_ = I2C_State::ERROR;
             error_ = I2C_Error::ERR_I2C_SB;
-            generateStopCondition();
+            Error_Handler();
         }
     }
     // ADDR Flag: Address sent and ACK received
@@ -133,9 +145,9 @@ void InterruptI2C::handleEVInterrupt() {
             } else {
                 RxBuffer.push(i2c_->DR);
                 XferSize--;
-                RxEventFlag = true;
-                state_      = I2C_State::READY;
-                mode_       = I2C_Mode::NONE;
+                state_ = I2C_State::READY;
+                mode_  = I2C_Mode::NONE;
+                RxEventFlag.store(true, std::memory_order_release);
                 disableInterruptFlag();
             }
         }

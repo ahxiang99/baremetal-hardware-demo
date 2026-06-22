@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <cstdio>
 
 #include "RingBuffer.hpp"
 #include "cpp/Dma.hpp"
 #include "cpp/Stm32I2C.hpp"
+#include "drivers.hpp"
 #include "pch.hpp"
 
 struct XferParams {
@@ -13,50 +16,80 @@ struct XferParams {
 };
 
 // Tags for the ISR-safe diagnostic log — written in ISR, consumed in processRx()
-enum class I2C_IsrTag : uint8_t { EV_ENTRY, EV_SB, EV_ADDR_TX, EV_ADDR_RX, EV_BTF_STOP, EV_BTF_STALL, EV_TXE, ER_AF, ER_BERR, ER_ARLO, ER_OVR, TX_DMA_FIRED, TX_DMA_DONE, RX_DMA_DONE };
+enum class I2C_IsrTag : uint8_t {
+    EV_ENTRY,
+    EV_SB,
+    EV_ADDR_TX,
+    EV_ADDR_RX,
+    EV_ADDR_RX_1BYTE,
+    EV_BTF_STOP,
+    EV_BTF_STALL,
+    EV_TXE,
+    EV_MEM_ADDR,
+    EV_MEM_RESTART,
+    EV_RXNE_1BYTE,
+    ER_AF,
+    ER_BERR,
+    ER_ARLO,
+    ER_OVR,
+    TX_DMA_FIRED,
+    TX_DMA_DONE,
+    RX_DMA_DONE
+};
 
 class DmaI2C : public Stm32I2C {
    private:
     using RxCallbackFn = void (*)(void*, void*);
 
    public:
-    bool initialize() override;
-    bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
-    bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
-    void handleEVInterrupt() override;
-    void handleERInterrupt() override;
-    void handleTxDmaInterrupt();
-    void handleRxDmaInterrupt();
-    void onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2);
-    void processRx();
+    bool               initialize();
+    bool               Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool               Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool               MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool               MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    void               handleEVInterrupt();
+    void               handleERInterrupt();
+    void               handleTxDmaInterrupt();
+    void               handleRxDmaInterrupt();
+    void               onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2);
+    void               processRx();
+
+    std::atomic<bool>* complete_flag_{nullptr};
 
    protected:
-    void onPostI2CInit() override;
+    void onPostI2CInit();
     IDma hdmatx;
     IDma hdmarx;
 
    private:
-    void                                initTxDma();
-    void                                initRxDma();
+    void                        initTxDma();
+    void                        initRxDma();
 
-    bool                                isHardwareBusy(const uint32_t& Timeout) override;
+    bool                        isHardwareBusy(const uint32_t& Timeout);
 
-    void                                enable_DMA_request_tx();
-    void                                enable_DMA_request_rx();
-    void                                disable_DMA_request();
+    void                        enable_DMA_request_tx();
+    void                        enable_DMA_request_rx();
+    void                        disable_DMA_request();
 
-    void                                enableInterrupt();
-    void                                disableInterrupt();
+    void                        enableInterrupt();
+    void                        disableInterrupt();
 
-    std::array<uint8_t, DMA_CHUNK_SIZE> dmaTxBuffer;
-    std::array<uint8_t, DMA_CHUNK_SIZE> rxBuffer;
+    void                        handleMasterEventInterrupt(const uint32_t& sr1, const uint32_t& sr2, const I2C_State& snap_state);
+    void                        handleMemEventInterrupt(const uint32_t& sr1, const uint32_t& sr2, const I2C_State& snap_state);
 
-    uint8_t                             DevAddr;
-    uint8_t*                            XferPtr;
-    uint8_t                             XferSize;
-    volatile bool                       RxEventFlag   = false;
-    volatile bool                       dma_complete_ = false;
-    volatile bool                       rxDmaPending_ = false;
+    std::array<uint8_t, 128>    dmaTxBuffer;
+    std::array<uint8_t, 128>    rxBuffer;
+    SpscRingBuffer<uint8_t, 16> TxBuffer;
+
+    uint8_t                     DevAddr;
+    uint8_t                     MemAddr_;
+    uint8_t*                    XferPtr;
+    uint8_t                     XferSize;
+    uint8_t                     XferLength;
+    std::atomic_bool            RxEventFlag{false};
+    std::atomic_bool            dma_complete_{false};
+    std::atomic_bool            rxDmaPending_{false};
+
     /* Function Callback */
     RxCallbackFn rx_fn_   = nullptr;
     void*        rx_ctx1_ = nullptr;

@@ -64,12 +64,6 @@ void IDma::configureDMA() {
     streamIdx                                   = flagBitshiftOffset[static_cast<uint8_t>(Config.Stream)];
 }
 
-void IDma::loadBuffer(uint8_t* pData, size_t len) {
-    for (size_t i = 0; i < len; ++i) {
-        dmaTxBuffer.at(i) = pData[i];
-    }
-}
-
 void IDma::handleInterrupt() {
     if (*ISR & (DMA_LISR_TCIF0 << streamIdx)) {
         /* Transfer Complete Call Back*/

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -40,7 +41,7 @@ class Sht40ad1b {
         float_t humidity{0.0f};
     };
 
-    Sht40ad1b(II2C& mBus, const char* name) : hi2c(mBus) {
+    Sht40ad1b(I2C_Ref mBus, const char* name) : hi2c(mBus) {
         std::strncpy(m_Name.data(), name, m_Name.size() - 1);
         m_Name.back() = '\0';
     }
@@ -84,6 +85,10 @@ class Sht40ad1b {
                 m_data.humidity = 0.0f;
             }
             m_State = SensorState::IDLE;
+        } else if (m_State == SensorState::WAIT_DATA) {
+            if (getDrivers().my_systick.get_ticks() - measure_start_time > 50) {
+                m_State = SensorState::IDLE;
+            }
         }
     }
 
@@ -104,7 +109,7 @@ class Sht40ad1b {
     }
 
    private:
-    II2C&                    hi2c;
+    I2C_Ref                  hi2c;
     std::array<char, 32>     m_Name;
     SensorState              m_State{SensorState::IDLE};
     uint32_t                 measure_start_time = 0;
@@ -128,6 +133,29 @@ class Packet {
         m_bytes[2] = sizeof(T);
         std::memcpy(&m_bytes[3], &data, sizeof(T));
         m_bytes[3 + sizeof(T)] = crc_calculate(&m_bytes[3], sizeof(T));
+    }
+
+    const uint8_t* raw() const {
+        return m_bytes.data();
+    }
+
+    size_t size() const {
+        return m_bytes.size();
+    }
+};
+
+template <typename T>
+class Packetv2 {
+    std::array<uint8_t, sizeof(T) + 5> m_bytes;
+
+   public:
+    explicit Packetv2(const T& data) {
+        m_bytes[0] = 0xAAU;
+        m_bytes[1] = 0x55U;
+        m_bytes[2] = 0xA2U;  // 0xA1U for Version 1 and 0xA2U for Version 2
+        m_bytes[3] = sizeof(T);
+        std::memcpy(&m_bytes[4], &data, sizeof(T));
+        m_bytes[4 + sizeof(T)] = crc_calculate(&m_bytes[4], sizeof(T));
     }
 
     const uint8_t* raw() const {

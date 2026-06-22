@@ -1,21 +1,30 @@
+#include <atomic>
+
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
+#include "RingBuffer.hpp"
 #include "Sht40ad1b.hpp"
 #include "cpp/Dma.hpp"
+#include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
+#include "cpp/Stm32I2C.hpp"
 #include "cpp/UartConcepts.hpp"
 #include "cpp/UartRef.hpp"
 #include "drivers.hpp"
 #include "pch.hpp"
+#include "stts2h.hpp"
 
-#define CLI_ENABLE 0
-#define SENSOR_ENABLE 1
+constexpr bool            kCliEnable    = false;
+constexpr bool            kSensorEnable = true;
+constexpr bool            kSendPacket   = false;
 
-#define CPACR (*((volatile uint32_t*)0xE000ED88))
+static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
 // Global Variables
-Sht40ad1b temp_sensor(getDrivers().i2c1, "SHT40");
-Cli       cmd;
+Sht40ad1b        temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
+Stts2h           stts_temp(I2C_Ref::from(getDrivers().i2c1));
+Cli              cmd;
+std::atomic_bool g_cmd_complete{true};
 
 /* Function Prototype */
 void Init_Driver(Drivers& g);
@@ -26,39 +35,57 @@ int main() {
     Drivers& g = getDrivers();
     Init_Driver(g);
     RegisterCallback();
-
+    SpscRingBuffer<I2CCommand, 4> cmd_queue;
     if (!g.timer.isRunning()) {
         g.timer.start(500);
     }
 
     uint32_t measure_start = g.my_systick.get_ticks();
+    stts_temp.initialize();
 
     while (1) {
-#if SENSOR_ENABLE
-        g.i2c1.processRx();
-        temp_sensor.ProcessData();
-
-        if (g.my_systick.get_ticks() - measure_start > 500) {
-            Packet<Sht40ad1b::SensorData> sensor_data(temp_sensor.getValue());
-            g.uart2.send(sensor_data.raw(), sensor_data.size());
-            measure_start = g.my_systick.get_ticks();
-        }
-
-#endif
-
-#if CLI_ENABLE
-        g.uart2.processRx();
-        if (cmd.getState() == CliState::WaitingForInput) {
-            cmd.get_input();
-            cmd.setState(CliState::Processing);
-        }
-#endif
         if (g.timer.isElapsed()) {
             g.gpio_led.Toggle();
             g.timer.start(500);
-#if !CLI_ENABLE && SENSOR_ENABLE
-            temp_sensor.read();
-#endif
+            if constexpr (!kCliEnable && kSensorEnable) {
+                cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
+                cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
+            }
+        }
+
+        if constexpr (kSensorEnable) {
+            g.i2c1.processRx();
+            temp_sensor.ProcessData();
+            stts_temp.processData();
+
+            /* Send data packet to PC via Uart2 */
+            if (g.my_systick.get_ticks() - measure_start > 500) {
+                if constexpr (kSendPacket) {
+                    Packet<Sht40ad1b::SensorData> sensor_data{temp_sensor.getValue()};
+                    g.uart2.send(sensor_data.raw(), sensor_data.size());
+                } else {
+                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                    LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
+                }
+                measure_start = g.my_systick.get_ticks();
+            }
+        }
+
+        if (g_cmd_complete.load(std::memory_order_acquire)) {
+            I2CCommand cmd;
+            if (cmd_queue.pop(cmd)) {
+                g_cmd_complete.store(false, std::memory_order_relaxed);
+                getDrivers().i2c1.complete_flag_ = &g_cmd_complete;
+                cmd.fn(cmd.ctx);
+            }
+        }
+
+        if constexpr (kCliEnable) {
+            g.uart2.processRx();
+            if (cmd.getState() == CliState::WaitingForInput) {
+                cmd.get_input();
+                cmd.setState(CliState::Processing);
+            }
         }
     }
     return 0;
@@ -77,34 +104,37 @@ void Init_Driver(Drivers& g) {
     g.my_systick.init();
 
     /* Configure Uart2 Pin */
-    constexpr GPIO_Config uart2_gpio_cfg{.port  = GPIO_Port::GPIO_PA,
-                                         .pin   = GPIO_PIN_2 | GPIO_PIN_3,
+
+    constexpr GPIO_Config uart2_gpio_cfg{.pin   = GPIO_PIN_2 | GPIO_PIN_3,
+                                         .port  = GPIO_Port::GPIO_PA,
                                          .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
                                          .otype = GPIO_OType::GPIO_OTYPER_PP,
                                          .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
                                          .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
                                          .afr   = GPIO_AFR::GPIO_AF7_USART1_2};
 
-    constexpr UartConfig  uart2_cfg{.dev_num  = UartNum::USART_D2,
-                                    .baudRate = UartBaudRate::_9600,
-#if CLI_ENABLE
-                                   .comm = UartComm::RX_TX,
-#else
-                                   .comm = UartComm::TX_ONLY,
-#endif
-                                   .parity   = UartParity::NONE,
-                                   .stopbits = UartStopBit::USART_CR2_STOP_1};
+    constexpr UartConfig  uart2_cfg{
+         .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
 
     /* This DMA Config is for USART2 Tx */
-    const DMA_Config hdmatx_cfg{.DMA_BaseAddress = DMA1, .Stream = DMA_Stream::Stream_6, .Channel = DMA_Channel::Channel_4, .Direction = DMA_Direction::DMA_MEMORY_TO_PERIPH, .Mode = DMA_Mode::Normal};
+    const DMA_Config hdmatx_cfg{.Peripheral      = DMA_Peripheral::USART2_TX,
+                                .DMA_BaseAddress = DMA1,
+                                .Stream          = DMA_Stream::Stream_6,
+                                .Channel         = DMA_Channel::Channel_4,
+                                .Direction       = DMA_Direction::DMA_MEMORY_TO_PERIPH,
+                                .Mode            = DMA_Mode::Normal};
 
     /* This DMA Config is for USART2 Rx */
-    const DMA_Config hdmarx_cfg{
-        .DMA_BaseAddress = DMA1, .Stream = DMA_Stream::Stream_5, .Channel = DMA_Channel::Channel_4, .Direction = DMA_Direction::DMA_PERIPH_TO_MEMORY, .Mode = DMA_Mode::Circular};
+    const DMA_Config hdmarx_cfg{.Peripheral      = DMA_Peripheral::USART2_RX,
+                                .DMA_BaseAddress = DMA1,
+                                .Stream          = DMA_Stream::Stream_5,
+                                .Channel         = DMA_Channel::Channel_4,
+                                .Direction       = DMA_Direction::DMA_PERIPH_TO_MEMORY,
+                                .Mode            = DMA_Mode::Circular};
 
     /* Configure i2c1 Pin */
-    constexpr GPIO_Config i2c1_gpio_config{.port  = GPIO_Port::GPIO_PB,
-                                           .pin   = GPIO_PIN_8 | GPIO_PIN_9,
+    constexpr GPIO_Config i2c1_gpio_config{.pin   = GPIO_PIN_8 | GPIO_PIN_9,
+                                           .port  = GPIO_Port::GPIO_PB,
                                            .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
                                            .otype = GPIO_OType::GPIO_OTYPER_OD,
                                            .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
@@ -122,22 +152,28 @@ void Init_Driver(Drivers& g) {
 
     /* Configure Uart */
     g.uart2.configure(uart2_cfg, hdmatx_cfg, hdmarx_cfg);
-    g.uart2.initialize();
+    auto result = g.uart2.initialize();
+    if (!result.isOk()) {
+        while (1);
+    }
     LOG_INFO("Booting...");
     LOG_INFO("USART2 Initialized");
 
-    I2C_Config i2c_config;
-    i2c_config.ClockFreq      = I2C_Clk_Freq::_100KHz;
-    i2c_config.AddressingMode = I2C_Addressing_Mode::AddressMode_7Bit;
-    i2c_config.OwnAddress1    = 0;
-    i2c_config.OwnAddress2    = 0;
-    g.i2c1.setVariable(I2C1, i2c_config);
+    constexpr I2C_Config i2c_config{
+        .DevNum          = I2C_DeviceNum::I2C_D1,
+        .ClockFreq       = I2C_FreqHz::_100KHz,
+        .OwnAddress1     = 0,
+        .AddressingMode  = I2C_Addressing_Mode::AddressMode_7Bit,
+        .DualAddressMode = 0,
+        .OwnAddress2     = 0,
+    };
+    g.i2c1.configure(i2c_config);
     g.i2c1.initialize();
     LOG_INFO("I2C1 Initialized");
 
     /* Blinking LED */
-    constexpr GPIO_Config gpio_led_cfg{.port  = GPIO_Port::GPIO_PA,
-                                       .pin   = GPIO_PIN_5,
+    constexpr GPIO_Config gpio_led_cfg{.pin   = GPIO_PIN_5,
+                                       .port  = GPIO_Port::GPIO_PA,
                                        .mode  = GPIO_Moder::GPIO_MODE_OUTPUT,
                                        .otype = GPIO_OType::GPIO_OTYPER_PP,
                                        .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_LS,
@@ -158,26 +194,31 @@ void Init_Driver(Drivers& g) {
 }
 
 void RegisterCallback() {
-#if CLI_ENABLE
-    getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
-    cmd.setUart(UartRef::from(g.uart2));
-    cmd.setSensor(&temp_sensor);
-#endif
+    if constexpr (kCliEnable) {
+        getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
+        cmd.setUart(UartRef::from(g.uart2));
+        cmd.setSensor(&temp_sensor);
+    }
 
-#if SENSOR_ENABLE
-    getDrivers().i2c1.onDataReceived(
-        [](void* ctx1, void* ctx2) {
-            auto* temp_sensor = static_cast<Sht40ad1b*>(ctx1);
-            if (temp_sensor->getState() == Sht40ad1b::SensorState::WAIT_DATA) {
-                temp_sensor->setState(Sht40ad1b::SensorState::DATA_READY);
-            }
-#if CLI_ENABLE
-            auto* cmd = static_cast<Cli*>(ctx2);
-            cmd->setState(CliState::WaitingForInput);
-#endif
-        },
-        &temp_sensor, &cmd);
-#endif
+    if constexpr (kSensorEnable) {
+        getDrivers().i2c1.onDataReceived(
+            [](void* ctx1, void* ctx2) {
+                auto* temp_sensor = static_cast<Sht40ad1b*>(ctx1);
+                if (temp_sensor->getState() == Sht40ad1b::SensorState::WAIT_DATA) {
+                    temp_sensor->setState(Sht40ad1b::SensorState::DATA_READY);
+                }
+                auto* stts2h_sensor = static_cast<Stts2h*>(ctx2);
+                if (stts2h_sensor->getState() == Stts2h::SensorState::WAIT_DATA) {
+                    stts2h_sensor->setState(Stts2h::SensorState::DATA_READY);
+                }
+
+                if constexpr (kCliEnable) {
+                    auto* cmd = static_cast<Cli*>(ctx2);
+                    cmd->setState(CliState::WaitingForInput);
+                }
+            },
+            &temp_sensor, &stts_temp);
+    }
 }
 
 /* Interrupt Handler Function Start Here*/
@@ -214,7 +255,7 @@ extern "C" void I2C1_ER_IRQHandler(void) {
     getDrivers().i2c1.handleERInterrupt();
 }
 
-void HardFault_Handler(void) {
+extern "C" void HardFault_Handler(void) {
     /* Put a breakpoint on the line below */
     volatile int loop = 1;
     while (loop) {

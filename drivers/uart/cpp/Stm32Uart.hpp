@@ -12,6 +12,8 @@ enum class UartState : uint8_t { Reset, Ready, BusyTx, BusyRx, Error };
 
 enum class UartError : uint8_t { None, Timeout, Framing, Overrun, Parity, InvalidConfig };
 
+enum class UartInitError : uint8_t { NullPeripheral, InvalidBaudRate, InvalidConfig, InvalidPostInit, AlreadyInitialised };
+
 enum class UartNum : uint8_t { USART_D1, USART_D2, USART_D6, Dev_Total };
 
 enum class UartBaudRate : uint16_t { _9600 = 0x683, _115200 = 0x008B };
@@ -45,22 +47,21 @@ class Stm32Uart {
     UartState      tx_state_{UartState::Reset};
     UartState      rx_state_{UartState::Reset};
     UartError      error_{UartError::None};
+    bool           m_Init = false;
 
     void           clearFlag();
-    void           onTxInterrupt();
-    void           onRxInterrupt();
-    void           onIdleInterrupt();
     void           enableNVICInterrupt();
 
    private:
-    void enablePeripheral();
-    void disablePeripheral();
+    constexpr static uint32_t Timeout = 0x100U;
+    void                      enablePeripheral();
+    void                      disablePeripheral();
 
-    void enablePeripheralClock();
-    void disablePeripheralClock();
+    void                      enablePeripheralClock();
+    void                      disablePeripheralClock();
 
-    void configureBaudRate();
-    void configureParity();
-    void configureStopBits();
-    void configureComm();
+    void                      configureBaudRate();
+    void                      configureParity();
+    void                      configureStopBits();
+    void                      configureComm();
 };

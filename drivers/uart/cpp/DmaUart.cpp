@@ -5,8 +5,10 @@
 #include <cstdint>
 
 #include "RegisterUtils.hpp"
+#include "Result.hpp"
 #include "Stm32Uart.hpp"
 #include "cpp/Dma.hpp"
+#include "cpp/UartRef.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
 #include "low-level/uart_bitfields.h"
@@ -20,12 +22,19 @@ void DmaUart::configure(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg,
     hdmarx.setConfig(rxdma_cfg);
 }
 
-bool DmaUart::initialize() {
-    if (!Stm32Uart::initialize()) {
-        return false;
+Result<bool, UartInitError> DmaUart::initialize() {
+    if (uart_ == nullptr) {
+        return Result<bool, UartInitError>::fail(UartInitError::NullPeripheral);
     }
-    onPostUartInit();
-    return true;
+    if (m_Init) {
+        return Result<bool, UartInitError>::fail(UartInitError::AlreadyInitialised);
+    }
+    if (Stm32Uart::initialize()) {
+        onPostUartInit();
+        return Result<bool, UartInitError>::success(true);
+    } else {
+        return Result<bool, UartInitError>::fail(UartInitError::InvalidConfig);
+    }
 }
 
 void DmaUart::onPostUartInit() {
@@ -75,7 +84,7 @@ void DmaUart::initDmaRx() {
         },
         this);
 
-    hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), DMA_CHUNK_SIZE);
+    hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), CHUNK_SIZE);
 }
 
 void DmaUart::enable_DMA_request() {
@@ -132,7 +141,7 @@ bool DmaUart::startNextDmaTransfer() {
     if (tx_state_ == UartState::Ready) {
         tx_state_     = UartState::BusyTx;
 
-        uint32_t Size = (txBuffer.size() > DMA_CHUNK_SIZE) ? DMA_CHUNK_SIZE : txBuffer.size();
+        uint32_t Size = (txBuffer.size() > CHUNK_SIZE) ? CHUNK_SIZE : txBuffer.size();
 
         for (size_t i = 0; i < Size; ++i) {
             dmaTxBuffer.at(i) = txBuffer.pop().value();
@@ -153,7 +162,7 @@ bool DmaUart::startNextDmaReceive() {
         RegisterUtils::setBits(uart_->CR1, USART_CR1_IDLEIE);
     }
     if (!hdmarx.is_Enabled()) {
-        hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), DMA_CHUNK_SIZE);
+        hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), CHUNK_SIZE);
     }
     return true;
 }
@@ -170,11 +179,11 @@ void DmaUart::processRx() {
 
         size_t transfer_size = rxBuffer.size();
 
-        if (transfer_size > DMA_CHUNK_SIZE) {
-            transfer_size = DMA_CHUNK_SIZE;
+        if (transfer_size > CHUNK_SIZE) {
+            transfer_size = CHUNK_SIZE;
         }
 
-        std::array<uint8_t, DMA_CHUNK_SIZE> transfer_buffer;
+        std::array<uint8_t, CHUNK_SIZE> transfer_buffer;
         for (size_t i = 0; i < transfer_size; ++i) {
             auto temp = rxBuffer.pop();
             if (temp.has_value()) {
@@ -196,12 +205,10 @@ void DmaUart::handleInterrupt() {
         onIdleInterrupt();
     } else if (sr & USART_SR_ORE) {
         clearFlag();
+        error_ = UartError::Overrun;
+        rxBuffer.sync_dma_head(hdmarx.getDmaStream()->NDTR);
     }
 }
-
-void DmaUart::onTxInterrupt() {}
-
-void DmaUart::onRxInterrupt() {}
 
 void DmaUart::onIdleInterrupt() {
     captured_ndtr_ = static_cast<uint16_t>(hdmarx.getDmaStream()->NDTR);

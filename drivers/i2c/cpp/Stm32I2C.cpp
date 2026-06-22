@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include <atomic>
 #include <cstddef>
 
 #include "RegisterUtils.hpp"
@@ -10,8 +11,26 @@
 #include "drivers.hpp"
 #include "logger.hpp"
 #include "low-level/i2c_bitfields.h"
+#include "low-level/i2c_registers.h"
+#include "low-level/nvic.h"
 #include "low-level/rcc.h"
+#include "low-level/rcc_bitfields.h"
 #include "pch.hpp"
+
+static const peripherals_regs_table<I2C_TypeDef> i2c_table[static_cast<uint8_t>(I2C_DeviceNum::TotalNum)] = {
+    {I2C1, RCC_APB1ENR_I2C1_EN, RCC_APB1RSTR_I2C1_RST},
+    {I2C2, RCC_APB1ENR_I2C2_EN, RCC_APB1RSTR_I2C2_RST},
+    {I2C3, RCC_APB1ENR_I2C3_EN, RCC_APB1RSTR_I2C3_RST}
+};
+
+Stm32I2C::Stm32I2C(const I2C_Config& Config) : config_(Config) {
+    i2c_ = i2c_table[static_cast<uint8_t>(config_.DevNum)].instance;
+}
+
+void Stm32I2C::configure(const I2C_Config& Config) {
+    config_ = Config;
+    i2c_    = i2c_table[static_cast<uint8_t>(config_.DevNum)].instance;
+}
 
 bool Stm32I2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) {
     return WriteTo7BitDevice(DevAddress, pData, Size, Timeout);
@@ -42,7 +61,6 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_SB; /* Cannot generate start condition */
-            Error_Handler();
             return false;
         }
 
@@ -54,7 +72,6 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_AF; /* Acknowledgment Failure */
-            Error_Handler();
             return false;
         }
 
@@ -67,7 +84,6 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
                 state_ = I2C_State::READY;
                 mode_  = I2C_Mode::NONE;
                 error_ = I2C_Error::ERR_I2C_TXE;
-                Error_Handler();
                 return false;
             }
             i2c_->DR = *pData;
@@ -82,7 +98,6 @@ bool Stm32I2C::WriteTo7BitDevice(uint16_t DevAddress, const uint8_t* pData, uint
                 state_ = I2C_State::READY;
                 mode_  = I2C_Mode::NONE;
                 error_ = I2C_Error::ERR_I2C_BTF;
-                Error_Handler();
                 return false;
             }
         }
@@ -120,7 +135,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_SB;
-            Error_Handler();
             return false;
         }
         /* Send Slave Address */
@@ -132,7 +146,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
             state_ = I2C_State::READY;
             mode_  = I2C_Mode::NONE;
             error_ = I2C_Error::ERR_I2C_AF;
-            Error_Handler();
             return false;
         }
 
@@ -150,7 +163,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_RXNE;
-                        Error_Handler();
                         return false;
                     }
                     *pData = i2c_->DR;
@@ -169,7 +181,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_BTF;
-                        Error_Handler();
                         return false;
                     }
                     RegisterUtils::clearBits(i2c_->CR1, I2C_CR1_ACK);
@@ -181,7 +192,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                         state_ = I2C_State::READY;
                         mode_  = I2C_Mode::NONE;
                         error_ = I2C_Error::ERR_I2C_BTF;
-                        Error_Handler();
                         return false;
                     }
 
@@ -199,7 +209,6 @@ bool Stm32I2C::ReadFrom7BitDevice(uint16_t DevAddress, uint8_t* pData, uint16_t 
                     state_ = I2C_State::READY;
                     mode_  = I2C_Mode::NONE;
                     error_ = I2C_Error::ERR_I2C_RXNE;
-                    Error_Handler();
                     return false;
                 }
                 *pData = i2c_->DR;
@@ -225,17 +234,15 @@ bool Stm32I2C::initialize() {
     enablePeripheralClock();
     configureI2C();
     enableI2C();
-    onPostI2CInit();
     state_ = I2C_State::READY;
     return true;
 }
 
-void Stm32I2C::setVariable(I2C_TypeDef* pInstance, const I2C_Config& Config) {
-    i2c_    = pInstance;
-    config_ = Config;
-}
-
 void Stm32I2C::enablePeripheralClock() {
+    volatile uint32_t* regs = &RCC->APB1ENR;
+    const uint32_t     mask{i2c_table[static_cast<uint8_t>(config_.DevNum)].enableBit};
+    RegisterUtils::setBits(*regs, mask);
+
     // Enable Peripheral Clock
     if (i2c_ == I2C1) {
         RegisterUtils::setBits(RCC->APB1ENR, RCC_APB1ENR_I2C1_EN);
@@ -295,10 +302,10 @@ void Stm32I2C::configureCCRandTrise() {
     /* Configrue CCR */
     uint32_t SCL_Freq = 1;
     switch (config_.ClockFreq) {
-        case I2C_Clk_Freq::_100KHz:
+        case I2C_FreqHz::_100KHz:
             SCL_Freq = 100000;
             break;
-        case I2C_Clk_Freq::_400Khz:
+        case I2C_FreqHz::_400Khz:
             SCL_Freq = 400000;
             break;
     }
@@ -310,10 +317,32 @@ void Stm32I2C::configureCCRandTrise() {
     RegisterUtils::setBits(i2c_->TRISE, Trise);
 }
 
+void Stm32I2C::resetPeripheral() {
+    // Disable peripheral — clears all internal state machines (RM0368 §18.3.3)
+    disableI2C();
+
+    // Dummy read to flush any pending DR/SR data before re-enable
+    volatile uint32_t dummy = i2c_->SR1;
+    dummy                   = i2c_->SR2;
+    (void)dummy;
+
+    // Re-enable with same configuration already written to CR1/CR2/CCR/TRISE
+    enableI2C();
+
+    mode_ = I2C_Mode::NONE;
+    error_.store(I2C_Error::NONE, std::memory_order::relaxed);
+    state_.store(I2C_State::READY, std::memory_order_relaxed);
+}
+
 void Stm32I2C::Error_Handler() {
+    // Release bus before any reset — prevents SDA/SCL from staying asserted
     generateStopCondition();
-    LOG_ERROR("I2C Error: {}", static_cast<uint16_t>(error_));
-    while (1);
+
+    LOG_ERROR("I2C Error: {}", static_cast<uint16_t>(error_.load(std::memory_order_relaxed)));
+
+    // Soft-reset the peripheral so the next Write/Read call can retry cleanly.
+    // A full re-initialize() is unnecessary — CR1/CR2/CCR/TRISE are still valid.
+    resetPeripheral();
 }
 
 bool Stm32I2C::isHardwareBusy(const uint32_t& Timeout) {
@@ -335,13 +364,6 @@ bool Stm32I2C::WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, c
     }
     return true;
 }
-void Stm32I2C::clearAddrFlag() {
-    uint32_t temp;
-    temp = i2c_->SR1;
-    temp = i2c_->SR2;
-    (void)(temp);
-}
-
 void Stm32I2C::generateStartCondition() {
     RegisterUtils::setBits(i2c_->CR1, I2C_CR1_START);
 }
@@ -354,6 +376,12 @@ void Stm32I2C::enableAckBit() {
 void Stm32I2C::disableAckBit() {
     RegisterUtils::clearBits(i2c_->CR1, I2C_CR1_ACK);
 }
+void Stm32I2C::clearAddrFlag() {
+    uint32_t temp;
+    temp = i2c_->SR1;
+    temp = i2c_->SR2;
+    (void)(temp);
+}
 void Stm32I2C::clearAFFlag() {
     RegisterUtils::clearBits(i2c_->SR1, I2C_SR1_AF);
 }
@@ -365,4 +393,22 @@ void Stm32I2C::clearARLOFLag() {
 }
 void Stm32I2C::clearOVRFLag() {
     RegisterUtils::clearBits(i2c_->SR1, I2C_SR1_OVR);
+}
+void Stm32I2C::enableNVICInterrupt() {
+    switch (config_.DevNum) {
+        case I2C_DeviceNum::I2C_D1:
+            My_NVIC_EnableIRQ(I2C1_EV_IRQn);
+            My_NVIC_EnableIRQ(I2C1_ER_IRQn);
+            break;
+        case I2C_DeviceNum::I2C_D2:
+            My_NVIC_EnableIRQ(I2C2_EV_IRQn);
+            My_NVIC_EnableIRQ(I2C2_ER_IRQn);
+            break;
+        case I2C_DeviceNum::I2C_D3:
+            My_NVIC_EnableIRQ(I2C3_EV_IRQn);
+            My_NVIC_EnableIRQ(I2C3_ER_IRQn);
+            break;
+        case I2C_DeviceNum::TotalNum:
+            break;
+    }
 }

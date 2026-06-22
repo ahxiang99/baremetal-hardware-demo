@@ -20,44 +20,46 @@ enum class I2C_Error : uint8_t {
     ERR_I2C_DATA_EMPTY
 };
 
-enum class I2C_Clk_Freq : uint8_t { _100KHz, _400Khz };
+enum class I2C_DeviceNum { I2C_D1, I2C_D2, I2C_D3, TotalNum };
+
+enum class I2C_FreqHz : uint8_t { _100KHz, _400Khz };
 
 enum class I2C_Addressing_Mode : uint8_t { AddressMode_7Bit, AddressMode_10Bit };
 
-enum class I2C_Mode : uint8_t { NONE, MASTER, SLAVE, MEM };
+enum class I2C_Mode : uint8_t { NONE, MASTER, SLAVE, MEM_READ, MEM_WRITE };
 
 struct I2C_Config {
-    I2C_Clk_Freq        ClockFreq;
+    I2C_DeviceNum       DevNum;
+    I2C_FreqHz          ClockFreq;
     uint32_t            OwnAddress1;
     I2C_Addressing_Mode AddressingMode;
     uint32_t            DualAddressMode;
     uint32_t            OwnAddress2;
 };
 
-class Stm32I2C : public II2C {
+class Stm32I2C {
    protected:
-    I2C_TypeDef*       i2c_ = nullptr;
-    I2C_Config         config_;
-    volatile I2C_State state_ = I2C_State::RESET;
-
-    I2C_Error          error_ = I2C_Error::NONE;
-    I2C_Mode           mode_  = I2C_Mode::NONE;
+    I2C_TypeDef*           i2c_ = nullptr;
+    I2C_Config             config_;
+    std::atomic<I2C_State> state_{I2C_State::RESET};
+    std::atomic<I2C_Error> error_{I2C_Error::NONE};
+    I2C_Mode               mode_ = I2C_Mode::NONE;
 
    public:
     Stm32I2C() {}
-    Stm32I2C(I2C_TypeDef* pInstance, const I2C_Config& Config) : i2c_(pInstance), config_(Config) {}
-    void setVariable(I2C_TypeDef* pInstance, const I2C_Config& Config);
-    bool initialize() override;
-    bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
-    bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout) override;
-    void handleEVInterrupt() override {};
-    void handleERInterrupt() override {};
+    Stm32I2C(const I2C_Config& Config);
+    void configure(const I2C_Config& Config);
+    bool initialize();
+    bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    void handleEVInterrupt();
+    void handleERInterrupt();
 
    protected:
-    virtual void onPostI2CInit() {}
-    virtual void Error_Handler();
-    virtual bool isHardwareBusy(const uint32_t& Timeout);
-    virtual bool WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
+    bool isHardwareBusy(const uint32_t& Timeout);
+    bool WaitForFlagTimeout(volatile uint32_t& sr, const uint32_t& mask, const uint32_t& Timeout);
+    void Error_Handler();
+    void resetPeripheral();
 
     // Start, Stop Generation
     void generateStartCondition();
@@ -69,6 +71,8 @@ class Stm32I2C : public II2C {
     void enableI2C();
     void disableI2C();
 
+    void enableNVICInterrupt();
+
     // Clear Flag
     void clearAddrFlag();
     void clearAFFlag();
@@ -78,7 +82,6 @@ class Stm32I2C : public II2C {
 
    private:
     void enablePeripheralClock();
-
     void configureI2C();
     void configurePeripheralFreq();
     void configureAddressingMode();
