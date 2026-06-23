@@ -3,6 +3,7 @@
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
 #include "RingBuffer.hpp"
+#include "SensorPacket.hpp"
 #include "Sht40ad1b.hpp"
 #include "cpp/Dma.hpp"
 #include "cpp/II2C.hpp"
@@ -13,6 +14,7 @@
 #include "drivers.hpp"
 #include "pch.hpp"
 #include "stts2h.hpp"
+
 
 constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;

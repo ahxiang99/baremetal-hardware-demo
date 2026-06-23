@@ -9,28 +9,10 @@
 #include "FloatIntExtraction.hpp"
 #include "RingBuffer.hpp"
 #include "cpp/II2C.hpp"
-#include "cpp/systick.hpp"
+#include "crc_calculation.hpp"
 #include "drivers.hpp"
 #include "logger.hpp"
 
-inline uint8_t crc_calculate(const uint8_t* data, uint16_t count) {
-    const uint8_t crc8_polynomial = 0x31;
-    uint8_t       crc             = 0xFF;
-
-    /* Calculate 8-bit checksum for given polynomial */
-    for (uint16_t index = 0; index < count; index++) {
-        crc ^= data[index];
-        for (uint8_t crc_bit = 8U; crc_bit > 0U; crc_bit--) {
-            crc = ((crc & 0x80U) != 0U) ? ((crc << 1) ^ crc8_polynomial) : (crc << 1);
-        }
-    }
-
-    return crc;
-}
-
-inline uint8_t crc_check(const uint8_t* data, uint16_t count, uint8_t crc) {
-    return (crc_calculate(data, count) == crc) ? 1U : 0U;
-}
 
 class Sht40ad1b {
    public:
@@ -126,54 +108,4 @@ class Sht40ad1b {
     /* Read Instruction Variables */
     SensorData             m_data;
     std::array<uint8_t, 6> raw_data;
-};
-
-template <typename T>
-class Packet {
-    std::array<uint8_t, sizeof(T) + 4> m_bytes;
-
-   public:
-    explicit Packet(const T& data) {
-        m_bytes[0] = 0xAAU;
-        m_bytes[1] = 0x55U;
-        m_bytes[2] = sizeof(T);
-        std::memcpy(&m_bytes[3], &data, sizeof(T));
-        m_bytes[3 + sizeof(T)] = crc_calculate(&m_bytes[3], sizeof(T));
-    }
-
-    const uint8_t* raw() const {
-        return m_bytes.data();
-    }
-
-    size_t size() const {
-        return m_bytes.size();
-    }
-};
-
-enum class PacketType {
-    VERSION_1 = 0x01U,
-    VERSION_2 = 0x02U,
-};
-
-template <typename T, PacketType pType>
-class PacketV2 {
-    std::array<uint8_t, sizeof(T) + 5> m_bytes;
-
-   public:
-    explicit PacketV2(const T& data) {
-        m_bytes[0] = 0xAAU;
-        m_bytes[1] = 0x55U;
-        m_bytes[2] = static_cast<uint8_t>(pType);  // 0x01U for Version 1 and 0x02U for Version 2
-        m_bytes[3] = sizeof(T);
-        std::memcpy(&m_bytes[4], &data, sizeof(T));
-        m_bytes[4 + sizeof(T)] = crc_calculate(&m_bytes[4], sizeof(T));
-    }
-
-    const uint8_t* raw() const {
-        return m_bytes.data();
-    }
-
-    size_t size() const {
-        return m_bytes.size();
-    }
 };

@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - '-ferror-limit=0'
+  CompilationDatabase: build/
+Diagnostics:
+  Suppress:
+    - unused-includes
+    - unknown_typename

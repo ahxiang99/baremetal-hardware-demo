@@ -6,10 +6,11 @@
 
 #include "RingBuffer.hpp"
 #include "SensorRef.hpp"
-#include "cpp/Dma.hpp"
 #include "cpp/Stm32I2C.hpp"
 #include "drivers.hpp"
 #include "pch.hpp"
+
+class IDma;
 
 struct XferParams {
     uint32_t DevAddr;
