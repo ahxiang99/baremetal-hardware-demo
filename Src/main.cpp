@@ -9,12 +9,15 @@
 #include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
 #include "cpp/Stm32I2C.hpp"
+#include "cpp/Syscfg.hpp"
 #include "cpp/UartConcepts.hpp"
 #include "cpp/UartRef.hpp"
 #include "drivers.hpp"
+#include "low-level/nvic.h"
+#include "low-level/rcc_bitfields.h"
+#include "low-level/syscfg_registers.h"
 #include "pch.hpp"
 #include "stts2h.hpp"
-
 
 constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;
@@ -151,6 +154,10 @@ extern "C" void I2C1_ER_IRQHandler(void) {
     getDrivers().i2c1.handleERInterrupt();
 }
 
+extern "C" void EXTI15_10_IRQHandler(void) {
+    getDrivers().gpio_button.handleInterrupt();
+}
+
 extern "C" void HardFault_Handler(void) {
     /* Put a breakpoint on the line below */
     volatile int loop = 1;
@@ -255,6 +262,19 @@ void Init_Driver(Drivers& g) {
     timer_cfg.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
     timer_cfg.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
     g.timer.setVariable(TIM3, timer_cfg);
+
+    /* Configure for Button Input */
+    constexpr GPIO_Config gpio_button_cfg{.pin   = GPIO_PIN_13,
+                                          .port  = GPIO_Port::GPIO_PC,
+                                          .mode  = GPIO_Moder::GPIO_MODE_INPUT,
+                                          .otype = GPIO_OType::GPIO_OTYPER_PP,
+                                          .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_LS,
+                                          .pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP,
+                                          .afr   = GPIO_AFR::GPIO_AF0_SYSTEM};
+
+    /* GPIO C Pin 13 */
+    g.gpio_button.configure(gpio_button_cfg);
+    g.gpio_button.initialize();
 
     LOG_INFO("Initialized Done...");
 }

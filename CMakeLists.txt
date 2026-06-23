@@ -66,6 +66,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/syscfg/cpp/Syscfg.cpp
 
 )
 
@@ -73,6 +74,7 @@ set(sources_SRCS
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/syscfg
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc

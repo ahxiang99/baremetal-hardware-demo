@@ -5,10 +5,12 @@
 #include "cpp/Gpio.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
+#include "syscfg/cpp/Syscfg.hpp"
 
 struct Drivers {
     MySysTick    my_systick;
     Stm32GpioPin gpio_led;
+    Syscfg       gpio_button;
     DmaUart      uart2;
     Stm32Timer   timer;
     DmaI2C       i2c1;
