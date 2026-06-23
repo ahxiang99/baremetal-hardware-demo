@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "RingBuffer.hpp"
+#include "SensorRef.hpp"
 #include "cpp/Dma.hpp"
 #include "cpp/Stm32I2C.hpp"
 #include "drivers.hpp"
@@ -38,21 +39,25 @@ enum class I2C_IsrTag : uint8_t {
 };
 
 class DmaI2C : public Stm32I2C {
-   private:
-    using RxCallbackFn = void (*)(void*, void*);
-
    public:
-    bool               initialize();
-    bool               Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool               Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool               MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool               MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    void               handleEVInterrupt();
-    void               handleERInterrupt();
-    void               handleTxDmaInterrupt();
-    void               handleRxDmaInterrupt();
-    void               onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2);
-    void               processRx();
+    bool initialize();
+    bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    void handleEVInterrupt();
+    void handleERInterrupt();
+    void handleTxDmaInterrupt();
+    void handleRxDmaInterrupt();
+    void onDataReceived();
+    void processRx();
+
+    template <Sensor T>
+    void addReceiver(T& obj) {
+        if (receivers_count < receivers_.size()) {
+            receivers_[receivers_count++] = SensorRef(obj);
+        }
+    }
 
     std::atomic<bool>* complete_flag_{nullptr};
 
@@ -81,6 +86,9 @@ class DmaI2C : public Stm32I2C {
     std::array<uint8_t, 128>    rxBuffer;
     SpscRingBuffer<uint8_t, 16> TxBuffer;
 
+    std::array<SensorRef, 8>    receivers_;
+    uint8_t                     receivers_count{0};
+
     uint8_t                     DevAddr;
     uint8_t                     MemAddr_;
     uint8_t*                    XferPtr;
@@ -89,11 +97,6 @@ class DmaI2C : public Stm32I2C {
     std::atomic_bool            RxEventFlag{false};
     std::atomic_bool            dma_complete_{false};
     std::atomic_bool            rxDmaPending_{false};
-
-    /* Function Callback */
-    RxCallbackFn rx_fn_   = nullptr;
-    void*        rx_ctx1_ = nullptr;
-    void*        rx_ctx2_ = nullptr;
 
     // ISR-safe diagnostic log: push_isr_event() is safe to call from any ISR;
     // drain_isr_log() must only be called from the main loop (processRx).

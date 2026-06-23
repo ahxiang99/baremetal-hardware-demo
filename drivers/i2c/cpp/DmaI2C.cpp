@@ -526,10 +526,10 @@ void DmaI2C::disableInterrupt() {
     constexpr uint32_t mask = I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN;
     RegisterUtils::clearBits(i2c_->CR2, mask);
 }
-void DmaI2C::onDataReceived(RxCallbackFn fn, void* ctx1, void* ctx2) {
-    rx_fn_   = fn;
-    rx_ctx1_ = ctx1;
-    rx_ctx2_ = ctx2;
+void DmaI2C::onDataReceived() {
+    for (auto& c : receivers_) {
+        c.notify();
+    }
 }
 void DmaI2C::processRx() {
     drain_isr_log();
@@ -549,7 +549,7 @@ void DmaI2C::processRx() {
     for (size_t i = 0; i < XferLength; ++i) {
         XferPtr[i] = rxBuffer[i];
     }
-    if (rx_fn_) rx_fn_(rx_ctx1_, rx_ctx2_);
+    onDataReceived();
     if (complete_flag_) complete_flag_->store(true, std::memory_order_release);
 }
 

@@ -16,7 +16,7 @@
 
 constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;
-constexpr bool            kSendPacket   = false;
+constexpr bool            kSendPacket   = true;
 
 static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
@@ -35,6 +35,7 @@ int main() {
     Drivers& g = getDrivers();
     Init_Driver(g);
     RegisterCallback();
+
     SpscRingBuffer<I2CCommand, 4> cmd_queue;
     if (!g.timer.isRunning()) {
         g.timer.start(500);
@@ -44,25 +45,30 @@ int main() {
     stts_temp.initialize();
 
     while (1) {
+        /* Timer to keep firing read command when it is elapsed.*/
         if (g.timer.isElapsed()) {
             g.gpio_led.Toggle();
-            g.timer.start(500);
+            g.timer.start(250);
             if constexpr (!kCliEnable && kSensorEnable) {
                 cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
                 cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
             }
         }
 
+        /* To process i2c and Sensor Data*/
         if constexpr (kSensorEnable) {
             g.i2c1.processRx();
             temp_sensor.ProcessData();
             stts_temp.processData();
 
             /* Send data packet to PC via Uart2 */
-            if (g.my_systick.get_ticks() - measure_start > 500) {
+            if (g.my_systick.get_ticks() - measure_start > 300) {
                 if constexpr (kSendPacket) {
-                    Packet<Sht40ad1b::SensorData> sensor_data{temp_sensor.getValue()};
-                    g.uart2.send(sensor_data.raw(), sensor_data.size());
+                    PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
+                    g.uart2.send(sht40_data.raw(), sht40_data.size());
+                    PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+                    g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+
                 } else {
                     LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                     LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
@@ -71,6 +77,7 @@ int main() {
             }
         }
 
+        /* Command Queue */
         if (g_cmd_complete.load(std::memory_order_acquire)) {
             I2CCommand cmd;
             if (cmd_queue.pop(cmd)) {
@@ -80,6 +87,7 @@ int main() {
             }
         }
 
+        /* Command Line Interface Input Processing */
         if constexpr (kCliEnable) {
             g.uart2.processRx();
             if (cmd.getState() == CliState::WaitingForInput) {
@@ -91,7 +99,63 @@ int main() {
     return 0;
 }
 
-/* Function Definition */
+/* Function Body */
+
+void RegisterCallback() {
+    if constexpr (kCliEnable) {
+        getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
+        cmd.setUart(UartRef::from(getDrivers().uart2));
+        cmd.setSensor(&temp_sensor);
+    }
+
+    if constexpr (kSensorEnable) {
+        getDrivers().i2c1.addReceiver(temp_sensor);
+        getDrivers().i2c1.addReceiver(stts_temp);
+        getDrivers().i2c1.addReceiver(cmd);
+    }
+}
+
+/* Interrupt Handler Function Start Here*/
+
+extern "C" void TIM3_IRQHandler(void) {
+    getDrivers().timer.handleInterrupt();
+}
+
+extern "C" void DMA1_Stream0_IRQHandler(void) {
+    getDrivers().i2c1.handleRxDmaInterrupt();
+}
+
+extern "C" void DMA1_Stream7_IRQHandler(void) {
+    getDrivers().i2c1.handleTxDmaInterrupt();
+}
+
+extern "C" void DMA1_Stream6_IRQHandler(void) {
+    getDrivers().uart2.handleTxDmaInterrupt();
+}
+
+extern "C" void DMA1_Stream5_IRQHandler(void) {
+    getDrivers().uart2.handleRxDmaInterrupt();
+}
+
+extern "C" void USART2_IRQHandler(void) {
+    getDrivers().uart2.handleInterrupt();
+}
+
+extern "C" void I2C1_EV_IRQHandler(void) {
+    getDrivers().i2c1.handleEVInterrupt();
+}
+
+extern "C" void I2C1_ER_IRQHandler(void) {
+    getDrivers().i2c1.handleERInterrupt();
+}
+
+extern "C" void HardFault_Handler(void) {
+    /* Put a breakpoint on the line below */
+    volatile int loop = 1;
+    while (loop) {
+        // If the debugger stops here, a HardFault occurred!
+    }
+}
 
 void Init_Driver(Drivers& g) {
     // Enable FPU by setting bits 20, 21, 22, and 23
@@ -191,74 +255,4 @@ void Init_Driver(Drivers& g) {
     g.timer.setVariable(TIM3, timer_cfg);
 
     LOG_INFO("Initialized Done...");
-}
-
-void RegisterCallback() {
-    if constexpr (kCliEnable) {
-        getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
-        cmd.setUart(UartRef::from(g.uart2));
-        cmd.setSensor(&temp_sensor);
-    }
-
-    if constexpr (kSensorEnable) {
-        getDrivers().i2c1.onDataReceived(
-            [](void* ctx1, void* ctx2) {
-                auto* temp_sensor = static_cast<Sht40ad1b*>(ctx1);
-                if (temp_sensor->getState() == Sht40ad1b::SensorState::WAIT_DATA) {
-                    temp_sensor->setState(Sht40ad1b::SensorState::DATA_READY);
-                }
-                auto* stts2h_sensor = static_cast<Stts2h*>(ctx2);
-                if (stts2h_sensor->getState() == Stts2h::SensorState::WAIT_DATA) {
-                    stts2h_sensor->setState(Stts2h::SensorState::DATA_READY);
-                }
-
-                if constexpr (kCliEnable) {
-                    auto* cmd = static_cast<Cli*>(ctx2);
-                    cmd->setState(CliState::WaitingForInput);
-                }
-            },
-            &temp_sensor, &stts_temp);
-    }
-}
-
-/* Interrupt Handler Function Start Here*/
-
-extern "C" void TIM3_IRQHandler(void) {
-    getDrivers().timer.handleInterrupt();
-}
-
-extern "C" void DMA1_Stream0_IRQHandler(void) {
-    getDrivers().i2c1.handleRxDmaInterrupt();
-}
-
-extern "C" void DMA1_Stream7_IRQHandler(void) {
-    getDrivers().i2c1.handleTxDmaInterrupt();
-}
-
-extern "C" void DMA1_Stream6_IRQHandler(void) {
-    getDrivers().uart2.handleTxDmaInterrupt();
-}
-
-extern "C" void DMA1_Stream5_IRQHandler(void) {
-    getDrivers().uart2.handleRxDmaInterrupt();
-}
-
-extern "C" void USART2_IRQHandler(void) {
-    getDrivers().uart2.handleInterrupt();
-}
-
-extern "C" void I2C1_EV_IRQHandler(void) {
-    getDrivers().i2c1.handleEVInterrupt();
-}
-
-extern "C" void I2C1_ER_IRQHandler(void) {
-    getDrivers().i2c1.handleERInterrupt();
-}
-
-extern "C" void HardFault_Handler(void) {
-    /* Put a breakpoint on the line below */
-    volatile int loop = 1;
-    while (loop) {
-        // If the debugger stops here, a HardFault occurred!
-    }
 }

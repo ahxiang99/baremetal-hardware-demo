@@ -27,7 +27,6 @@ const uint32_t HSI_Freq_Hz = 16000000;
 #include "Result.hpp"
 #include "drivers.hpp"
 
-
 /* Custom C Library */
 #include "bit_utils.h"
 #include "cmsis.h"

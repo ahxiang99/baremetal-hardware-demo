@@ -108,6 +108,12 @@ class Sht40ad1b {
         m_State = state;
     }
 
+    void onDataReceived() {
+        if (m_State == SensorState::WAIT_DATA) {
+            setState(SensorState::DATA_READY);
+        }
+    }
+
    private:
     I2C_Ref                  hi2c;
     std::array<char, 32>     m_Name;
@@ -144,15 +150,20 @@ class Packet {
     }
 };
 
-template <typename T>
-class Packetv2 {
+enum class PacketType {
+    VERSION_1 = 0x01U,
+    VERSION_2 = 0x02U,
+};
+
+template <typename T, PacketType pType>
+class PacketV2 {
     std::array<uint8_t, sizeof(T) + 5> m_bytes;
 
    public:
-    explicit Packetv2(const T& data) {
+    explicit PacketV2(const T& data) {
         m_bytes[0] = 0xAAU;
         m_bytes[1] = 0x55U;
-        m_bytes[2] = 0xA2U;  // 0xA1U for Version 1 and 0xA2U for Version 2
+        m_bytes[2] = static_cast<uint8_t>(pType);  // 0x01U for Version 1 and 0x02U for Version 2
         m_bytes[3] = sizeof(T);
         std::memcpy(&m_bytes[4], &data, sizeof(T));
         m_bytes[4 + sizeof(T)] = crc_calculate(&m_bytes[4], sizeof(T));

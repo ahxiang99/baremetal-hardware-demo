@@ -107,6 +107,12 @@ class Cli {
         state_ = state;
     }
 
+    void onDataReceived() {
+        setState(CliState::WaitingForInput);
+    }
+
+    void read() {}
+
    private:
     UartRef                   uart_;
     Sht40ad1b*                sensor_ = nullptr;

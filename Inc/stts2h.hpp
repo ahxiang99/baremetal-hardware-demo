@@ -77,6 +77,12 @@ class Stts2h {
         m_State.store(s, std::memory_order_release);
     }
 
+    void onDataReceived() {
+        if (m_State == SensorState::WAIT_DATA) {
+            setState(SensorState::DATA_READY);
+        }
+    }
+
    private:
     static constexpr uint8_t devAddr   = 0x71U;
     static constexpr uint8_t whoAmIReg = 0x01U;
