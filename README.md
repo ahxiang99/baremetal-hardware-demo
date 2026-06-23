@@ -1,241 +1,241 @@
-# STM32F401XE GPIO & Peripheral Driver
+# STM32F401 Bare-Metal Hardware Demo
 
-A C++17 embedded firmware project for STM32F401XE microcontroller with layered drivers for GPIO, UART, I2C, and SysTick interfaces.
+A bare-metal C++20 firmware project for the STM32F401XE (ARM Cortex-M4) demonstrating a multi-layer driver architecture with DMA-enabled I2C and UART, dual temperature sensors, and zero HAL dependency.
 
-## Target Hardware
+## What This Project Does
 
-- **MCU**: STM32F401XE (ARM Cortex-M4, 84 MHz)
-- **Flash**: 512 KB | **RAM**: 96 KB
-- **Features**: Hardware FPU, SysTick Timer
+The firmware reads temperature/humidity from two I2C sensors (SHT40-AD1B and STTS2H) on a 250 ms interval, then transmits structured binary packets to a host PC over UART2 using DMA. All peripheral access is via hand-written register drivers — no ST HAL or LL libraries.
+
+```
+SHT40-AD1B ──┐
+              ├── I2C1 (DMA) ──── STM32F401XE ──── UART2 (DMA) ──── PC
+STTS2H     ──┘                        │
+                                   TIM3 (250 ms tick)
+```
+
+## Key Features
+
+- **Zero HAL** — direct CMSIS register access via `volatile` struct pointers
+- **DMA everywhere** — I2C receive and UART transmit both use DMA, freeing the CPU
+- **Layered drivers** — thin C low-level header layer consumed by a C++ class layer
+- **Zero-cost abstractions** — CRTP, `constexpr`, and type-erasure instead of virtual dispatch
+- **No dynamic allocation** — `std::array`, stack, and static storage only
+- **Structured packet protocol** — versioned binary packets (`PacketV2<T, VERSION>`) for PC-side parsing
+- **Optional CLI** — UART command-line interface, toggled at compile time
+
+## Hardware
+
+| Item | Detail |
+|------|--------|
+| MCU | STM32F401XE, ARM Cortex-M4 @ 84 MHz |
+| Flash | 512 KB |
+| RAM | 96 KB |
+| FPU | Hardware FPV4-SP-D16 |
+| Sensor 1 | SHT40-AD1B — temperature + humidity (I2C, addr 0x44) |
+| Sensor 2 | STTS2H — temperature (I2C, addr 0x3F) |
+| UART | USART2, PA2 (TX) / PA3 (RX), 115200 baud |
+| I2C | I2C1, PB8 (SCL) / PB9 (SDA), 100 kHz |
+| LED | PA5 — toggles each timer tick as a heartbeat |
+| Debugger | ST-Link V2/V2-1 |
 
 ## Project Structure
 
 ```
 baremetal-hardware-demo/
+├── Src/
+│   └── main.cpp              # Application entry point, ISR routing
+├── Inc/
+│   ├── Sht40ad1b.hpp         # SHT40 sensor driver (state machine)
+│   ├── stts2h.hpp            # STTS2H sensor driver
+│   ├── SensorPacket.hpp      # Binary packet protocol (PacketV2<T>)
+│   ├── drivers.hpp           # Global Drivers struct (singleton accessor)
+│   └── pch.hpp               # Precompiled header
+├── Middleware/
+│   ├── logger.hpp            # Singleton logger ({} placeholders, no printf)
+│   ├── cli.hpp               # UART command-line interface
+│   └── RingBuffer.hpp        # Lock-free SPSC ring buffer template
+├── drivers/
+│   ├── common/               # RegisterUtils, FloatIntExtraction, bit_utils
+│   ├── gpio/                 # Stm32GpioPin (CRTP-based)
+│   ├── uart/                 # Stm32Uart → InterruptUart / DmaUart
+│   ├── i2c/                  # Stm32I2C → InterruptI2C / DmaI2C
+│   ├── timer/                # Stm32Timer (TIM3)
+│   ├── DMA/                  # IDma / Dma
+│   ├── systick/              # MySysTick (1 ms resolution)
+│   ├── rcc/                  # RCC low-level C helpers
+│   └── nvic/                 # NVIC helpers
 ├── CMakeLists.txt
-├── stm32f401xe_flash.ld
-├── Src/main.cpp
-├── Inc/TempSensor.hpp
-└── drivers/
-    ├── gpio/     # GPIO driver (C++ class + C low-level)
-    ├── uart/     # UART driver
-    ├── i2c/      # I2C driver
-    ├── systick/  # SysTick timer
-    ├── rcc/      # Reset & Clock Control
-    └── nvic/     # Interrupt controller
+├── CMakePresets.json
+└── stm32f401xe_flash.ld      # Linker script
 ```
 
 ## Driver Architecture
 
-Two-layer design for each peripheral:
-1. **C++ Class Layer**: Object-oriented interface with type safety (C++17)
-2. **C Low-level Layer**: Direct hardware register access for performance
+Each peripheral follows a two-layer pattern:
 
-## Drivers Overview
+**Low-level C layer** (`drivers/<peripheral>/low-level/`):
+- `*_registers.h` — memory-mapped register struct + base address macros
+- `*_bitfields.h` — bit-mask and shift constants
+- `*_types.h` — peripheral-specific enums and config structs
 
-### GPIO Driver
-Pin configuration and control with multiple modes.
+**C++ driver layer** (`drivers/<peripheral>/cpp/`):
+
+| Peripheral | Interface | Concrete classes |
+|---|---|---|
+| GPIO | `IGpio` | `Stm32GpioPin` |
+| UART | `IUart` → `UartBase` → `Stm32Uart` | `InterruptUart`, `DmaUart` |
+| I2C | `II2C` → `Stm32I2C` | `InterruptI2C`, `DmaI2C` |
+| Timer | `ITimer` | `Stm32Timer` |
+| DMA | `IDma` | `Dma` |
+| SysTick | — | `MySysTick` |
+
+**Init pattern** — two-phase to avoid static-init ordering issues:
 ```cpp
-GPIO_InitTypeDef cfg{GPIO_PA, GPIO_PIN_5, GPIO_MODE_OUTPUT, GPIO_OTYPER_PP};
-GPIO gpio_led{&cfg};
-gpio_led.TogglePin(GPIO_PIN_5);
-```
-**Features**: Input/Output modes, Push-Pull/Open-Drain, Speed control, Pull-up/Pull-down, Alternate functions
+// Phase 1: declare globals (zero-initialized)
+DmaI2C i2c1;
 
-### UART Driver
-Serial communication at 9600 baud (configurable).
-```cpp
-USART_InitTypeDef uart_cfg{USART_D2, RX_TX, _9600, USART_CR1_RXNEIE};
-UARTDevice uart{&uart_cfg};
-uart.Print("Hello, STM32!\r\n", 15);
-```
-**Features**: Configurable baud rate, interrupt-driven reception, line buffering
-
-### I2C Driver
-Non-blocking I2C communication (Standard mode, 100 kHz).
-```cpp
-I2C_InitTypeDef config{I2C_1, I2C_SPEED_STANDARD, 0, 0, 0, 0};
-i2c_device i2c{&config};
-i2c.Write(slave_addr, data, size);
-while (!i2c.isReady());
-i2c.Read(slave_addr, buffer, size);
-```
-**Features**: Non-blocking operations, state management, timeout handling
-
-### SysTick Timer
-Millisecond-precision delays with hardware interrupt.
-```cpp
-MySysTick(1000);  // Wait 1000 ms
+// Phase 2: configure and initialize in Init_Driver()
+i2c1.setVariable(I2C_1, i2c_cfg);
+i2c1.initialize();    // post-init hook wires up DMA channels automatically
 ```
 
-## Application: Temperature Sensor
+**ISR routing** — all ISR functions live in `Src/main.cpp` and delegate directly:
+```cpp
+extern "C" void DMA1_Stream5_IRQHandler() {
+    getDrivers().i2c1.handleRxDmaInterrupt();
+}
+```
 
-Reads I2C temperature sensor and outputs via UART.
-
-**Features**:
-- I2C measurement command & data retrieval
-- CRC-8 validation
-- Temperature formula: `°C = -45 + (175 × raw_value / 0xFFFF)`
-- UART output: `Reading: XX.YY`
-- LED (PA5) status indication
-
-## Building & Running
+## Getting Started
 
 ### Prerequisites
 
-- ARM GNU Toolchain (arm-none-eabi-gcc)
-- CMake 3.20+
-- STM32CubeMX or ST-Link utility for programming
-- VS Code with C/C++ extensions (optional)
+- [ARM GNU Toolchain](https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain) (`arm-none-eabi-gcc` ≥ 12)
+- CMake ≥ 3.20
+- ST-Link V2/V2-1 debugger + [STM32CubeProgrammer](https://www.st.com/en/development-tools/stm32cubeprog.html) or OpenOCD
 
-### Build Steps
+Optional (for VS Code debugging):
+- [STM32CubeIDE VS Code Extension](https://marketplace.visualstudio.com/items?itemName=stmicroelectronics.stm32-vscode-extension)
+- A debug configuration is pre-configured in `.vscode/launch.json`
+
+### Build
 
 ```bash
-# Clone and configure
-git clone https://github.com/ahxiang99/GPIO_Driver_cpp.git
-cd GPIO_Driver_cpp
+git clone https://github.com/ahxiang99/baremetal-hardware-demo.git
+cd baremetal-hardware-demo
+
+# Configure (uses CMakePresets.json "default" preset)
 cmake --preset default
 
 # Build
 cmake --build build
-
-# Output files
-# - build/GPIO_Driver.elf    (ELF executable)
-# - build/GPIO_Driver.hex    (Intel HEX)
-# - build/GPIO_Driver.bin    (Binary)
 ```
 
-### Programming
+Post-build steps print memory usage and generate:
+- `build/baremetal-hardware-demo.elf`
+- `build/baremetal-hardware-demo.hex`
+- `build/baremetal-hardware-demo.bin`
 
+### Flash
+
+**With STM32CubeProgrammer:**
+```bash
+STM32_Programmer_CLI -c port=SWD -d build/baremetal-hardware-demo.bin 0x08000000 -v -rst
+```
+
+**With OpenOCD:**
 ```bash
 openocd -f interface/stlink-v2.cfg -f target/stm32f4x.cfg \
-  -c "program build/GPIO_Driver.bin 0x08000000 verify reset"
+  -c "program build/baremetal-hardware-demo.bin 0x08000000 verify reset exit"
 ```
 
-## Configuration
+**With VS Code:** press **F5** — the launch configuration builds and flashes via ST-Link GDB server.
 
-### UART (Src/main.cpp)
-- Port: USART2 (PA2/PA3) | Baud: 9600 | 8N1
+### Verify
 
-### I2C (Src/main.cpp)
-- Interface: I2C1 | Speed: 100 kHz | Pins: PB8 (SCL), PB9 (SDA)
+Connect a serial terminal to USART2 (115200 8N1). With `kSendPacket = false`, readable log output appears:
 
-### GPIO
-- LED Output: PA5 (Push-Pull, Low Speed)
-- I2C Pins: PB8, PB9 (Alternate Function, Open-Drain)
-
-## Memory Usage
-
-- **Firmware Size**: ~29 KB
-- **RAM Usage**: < 10 KB (application code)
-
-## Compiler Settings
-
-- **C/C++**: C11 / C++17
-- **Optimization**: `-O0` (Debug), `-Os` (Release)
-- **Warnings**: `-Wall -Wextra -Wpedantic`
-- **Target**: ARM Cortex-M4, Thumb-2, Hardware FPU
-
-## Testing & Debugging
-
-### Serial Monitor
 ```
-Port: /dev/ttyUSB0 (Linux) or COM3 (Windows)
-Baud: 9600 | 8N1 | No Flow Control
+[INFO] SHT40: Temp:25, Rh:48
+[INFO] STTS2H: Temp:25
 ```
 
-**Expected Output**:
+With `kSendPacket = true` (default), the firmware emits raw binary `PacketV2` frames instead, suited for a PC-side parser.
+
+## Compile-Time Feature Flags
+
+All flags are `constexpr bool` at the top of `Src/main.cpp`:
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `kSensorEnable` | `true` | Enable SHT40 + STTS2H sensor reads |
+| `kSendPacket` | `true` | Send binary `PacketV2` frames; `false` → human-readable log |
+| `kCliEnable` | `false` | Enable UART CLI (`get-temp`, `help` commands) |
+
+## Sensor Application
+
+Both sensors share I2C1. The main loop uses a command queue (`SpscRingBuffer<I2CCommand, 4>`) so only one I2C transaction is in flight at a time, guarded by `std::atomic_bool g_cmd_complete`.
+
+**SHT40-AD1B state machine** (`Inc/Sht40ad1b.hpp`):
 ```
-Booting...
-Reading: 25.43
-Reading: 25.42
+IDLE ──read()──► MEASURING ──30 ms──► WAIT_DATA ──DMA done──► DATA_READY ──► IDLE
 ```
 
-### Hardware Requirements
-- ST-Link V2/V2-1 debugger
-- USB connection to development board
-- Serial terminal for UART output
+Each state transition is driven by `ProcessData()` called from the main loop. CRC-8 validates the 6-byte response before accepting temperature and humidity values.
 
-## API Reference
+## Middleware
 
-### GPIO Class
+### Logger
+
 ```cpp
-class GPIO {
-    GPIO(GPIO_InitTypeDef* _cfg);
-    GPIO_STATUS InitDriver(GPIO_Config* p_Config);
-    GPIO_STATUS TogglePin(const uint16_t PIN);
-    bool IsInit();
-};
+Logger::Init(uart_ref);
+LOG_INFO("Temp:{}, Rh:{}", sensor.getValue().temperature, sensor.getValue().humidity);
 ```
 
-### UART Class
+Uses `{}` placeholders. Floats are printed via `FloatIntExtraction` (splits into integer + decimal parts) to avoid newlib `%f` overhead.
+
+### Ring Buffer
+
 ```cpp
-class UARTDevice {
-    USART_Status Print(const char* buffer, uint16_t size);
-    USART_Status Get(char* c);
-    const char* GetLine();
-};
+SpscRingBuffer<I2CCommand, 4> cmd_queue;   // power-of-2 capacity required
+cmd_queue.push({fn_ptr, &ctx});
+I2CCommand cmd;
+if (cmd_queue.pop(cmd)) cmd.fn(cmd.ctx);
 ```
 
-### I2C Class
-```cpp
-class i2c_device {
-    I2C_Status Write(uint8_t target_addr, const uint8_t* pData, uint16_t size);
-    I2C_Status Read(uint8_t target_addr, uint8_t* pBuffer, uint16_t size);
-    bool isReady() const;
-};
-```
+Lock-free single-producer / single-consumer; safe between main loop and ISR context.
 
-### Temperature Sensor Class
-```cpp
-class TempSensor {
-    TempSensor(II2CMaster& p_Bus);
-    float_t GetTemp();
-};
-```
+## Peripheral Configuration
 
-## Performance
-
-- **GPIO**: < 1 µs response time
-- **UART**: 960 bytes/sec @ 9600 baud
-- **I2C**: 100 kHz standard mode
-- **SysTick**: 1 ms resolution (configurable)
+| Peripheral | Pins | Speed | Notes |
+|---|---|---|---|
+| USART2 | PA2 (TX), PA3 (RX) | 115200 baud | DMA TX, interrupt RX |
+| I2C1 | PB8 (SCL), PB9 (SDA) | 100 kHz | DMA RX, requires 4.7 kΩ pull-ups |
+| TIM3 | — | 250 ms period | Triggers sensor read + LED toggle |
+| SysTick | — | 1 ms tick | Used for timeouts and delays |
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Device not detected | Verify ST-Link connection, check USB drivers, ensure 3.3V target |
-| Compilation errors | Verify ARM toolchain in PATH, CMake ≥ 3.20, C++ headers |
-| UART no output | Check baud rate (9600), PA2/PA3 connection, UART clock enabled |
-| I2C not working | Verify 4.7kΩ pull-up resistors, slave address (0x88), I2C timing |
-
-## Code Style
-
-- **Classes**: `PascalCase` | **Functions**: `camelCase` | **Constants**: `UPPER_SNAKE_CASE`
-- **Private Members**: `m_` prefix
-- **Modular Design**: Reusable independent drivers
-- **Error Handling**: Status codes for critical operations
-
-## Contributing
-
-Submit PRs for bug fixes, additional drivers (SPI, ADC), optimizations, or documentation.
-
-## License
-
-Licensed under STMicroelectronics STM32 HAL license terms.
+| Symptom | Check |
+|---------|-------|
+| No UART output | Baud rate 115200, PA2/PA3 wired, USART2 clock enabled in RCC |
+| I2C not responding | 4.7 kΩ pull-ups on PB8/PB9, correct slave addresses (0x44 / 0x3F) |
+| Build fails | `arm-none-eabi-gcc` in PATH, CMake ≥ 3.20, C++20 support |
+| ST-Link not detected | USB drivers installed, 3.3 V target powered, SWD wired correctly |
+| Sensor data all zeros | Verify sensor is powered and I2C ACKs are observed on a logic analyser |
 
 ## References
 
-- [STM32F401xE Datasheet](https://www.st.com/resource/en/datasheet/stm32f401xe.pdf)
-- [STM32F4 Reference Manual](https://www.st.com/resource/en/reference_manual/dm00031020-stm32f405-415-stm32f407-417-stm32f427-437-and-stm32f429-439-advanced-arm-based-32-bit-mcus-stmicroelectroni.pdf)
-- [ARM Cortex-M4 User Guide](https://developer.arm.com/documentation/100166/latest)
-- [I2C Specification](https://www.nxp.com/docs/en/user-manual/UM10204.pdf)
+- [STM32F401xE Datasheet](Resources/STM32F401_Datasheet.pdf)
+- [STM32F4 Reference Manual](Resources/STM32F401_Reference-Manual.pdf)
+- [STM32F401 User Manual](Resources/STM32F401_User-Manual.pdf)
+- [SHT40 Datasheet](https://sensirion.com/products/catalog/SHT40)
+- [ARM Cortex-M4 Technical Reference Manual](https://developer.arm.com/documentation/100166/latest)
+
+## Contributing
+
+Pull requests are welcome for additional peripheral drivers (SPI, ADC, CAN), new sensor integrations, or PC-side packet parsers. Follow the two-layer driver pattern and keep all register access in the low-level headers.
 
 ## Author
 
-**ahxiang99** - Professional embedded systems firmware development project
-
----
-
-Last Updated: June 2026
+**ahxiang99** — bare-metal embedded firmware engineering
