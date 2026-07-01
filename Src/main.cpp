@@ -1,5 +1,6 @@
 #include <atomic>
 
+#include "FreeRTOS.h"
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
 #include "RingBuffer.hpp"
@@ -18,10 +19,11 @@
 #include "low-level/syscfg_registers.h"
 #include "pch.hpp"
 #include "stts2h.hpp"
+#include "task.h"
 
 constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;
-constexpr bool            kSendPacket   = !kCliEnable;
+constexpr bool            kSendPacket   = true;
 
 static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
@@ -33,54 +35,73 @@ std::atomic_bool g_cmd_complete{true};
 
 /* Function Prototype */
 void Init_Driver(Drivers& g);
+void SetNVICPriority();
 void RegisterCallback();
 
-/* Main Program Start Here */
-int main() {
-    Drivers& g = getDrivers();
-    Init_Driver(g);
-    RegisterCallback();
-
-    SpscRingBuffer<I2CCommand, 4> cmd_queue;
-    if (!g.timer.isRunning()) {
-        g.timer.start(500);
+void ledTask(void* params) {
+    Drivers&         g             = getDrivers();
+    TickType_t       xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xPeriod       = pdMS_TO_TICKS(100);
+    while (1) {
+        g.gpio_led.Toggle();
+        vTaskDelayUntil(&xLastWakeTime, xPeriod);  // replaces g.timer.start(100)
     }
+}
 
-    uint32_t measure_start = g.my_systick.get_ticks();
-    stts_temp.initialize();
-
+// Task 1 — sensorTask: owns I2C + sensor reading + packet sending
+void sensorTask(void* params) {
+    Drivers&                      g = getDrivers();
+    SpscRingBuffer<I2CCommand, 4> cmd_queue;
     while (1) {
         /* Timer to keep firing read command when it is elapsed.*/
-        if (g.timer.isElapsed()) {
-            g.gpio_led.Toggle();
-            g.timer.start(100);
-            if constexpr (!kCliEnable && kSensorEnable) {
-                cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
-                cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
+        if constexpr (!kCliEnable && kSensorEnable) {
+            cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
+            cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
+        }
+
+        /* Command Queue */
+        I2CCommand icmd;
+        while (cmd_queue.pop(icmd)) {
+            g_cmd_complete.store(false, std::memory_order_relaxed);
+            getDrivers().i2c1.complete_flag_ = &g_cmd_complete;
+            icmd.fn(icmd.ctx);  // Read Call
+
+            bool sensor_done = false;
+            while (!sensor_done) {
+                g.i2c1.processRx();
+                temp_sensor.ProcessData();  // State is not update
+                stts_temp.processData();
+                // Both sensors idle = current command fully complete:
+                bool sht40_idle  = temp_sensor.isIdle();
+                bool stts2h_idle = stts_temp.isIdle();
+
+                if (sht40_idle && stts2h_idle) break;
+
+                // Done when complete_flag is true AND no more I2C activity:
+                if (g_cmd_complete.load(std::memory_order_acquire)) {
+                    sensor_done = true;
+                }
+                vTaskDelay(pdMS_TO_TICKS(10));  // yield while polling
             }
         }
 
-        /* To process i2c and Sensor Data*/
         if constexpr (kSensorEnable) {
-            g.i2c1.processRx();
-            temp_sensor.ProcessData();
-            stts_temp.processData();
-
             /* Send data packet to PC via Uart2 */
-            if constexpr (!kCliEnable) {
-                if (g.my_systick.get_ticks() - measure_start > 300) {
-                    if constexpr (kSendPacket) {
-                        PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
-                        g.uart2.send(sht40_data.raw(), sht40_data.size());
-                        PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-                        g.uart2.send(stts2h_data.raw(), stts2h_data.size());
-
-                    } else {
-                        LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                        LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
-                    }
-                    measure_start = g.my_systick.get_ticks();
+            if constexpr (kSendPacket) {
+                PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
+                g.uart2.send(sht40_data.raw(), sht40_data.size());
+                PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+                g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+            } else {
+                if (temp_sensor.getState() == Sht40ad1b::SensorState::IDLE) {
+                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                 }
+                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
+                    LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
+                }
+            }
+
+            if constexpr (!kCliEnable) {
             } else {
                 if (cmd.getState() == CliState::Completed) {
                     LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
@@ -88,26 +109,43 @@ int main() {
                 }
             }
         }
+        vTaskDelay(pdMS_TO_TICKS(500));  // ← yield while waiting
+    }
+}
 
-        /* Command Queue */
-        if (g_cmd_complete.load(std::memory_order_acquire)) {
-            I2CCommand cmd;
-            if (cmd_queue.pop(cmd)) {
-                g_cmd_complete.store(false, std::memory_order_relaxed);
-                getDrivers().i2c1.complete_flag_ = &g_cmd_complete;
-                cmd.fn(cmd.ctx);
-            }
-        }
-
-        /* Command Line Interface Input Processing */
+// Task 2 — uartTask: owns CLI input (only when kCliEnable = true)
+void uartTask(void* params) {
+    /* Command Line Interface Input Processing */
+    while (1) {
         if constexpr (kCliEnable) {
+            Drivers& g = getDrivers();
             g.uart2.processRx();
             if (cmd.getState() == CliState::WaitingForInput) {
                 cmd.get_input();
                 cmd.setState(CliState::Processing);
             }
         }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
+
+/* Main Program Start Here */
+int main() {
+    Drivers& g = getDrivers();
+    Init_Driver(g);
+    RegisterCallback();
+    stts_temp.initialize();
+
+    xTaskCreate(ledTask, "LED", 256, NULL, 4, NULL);
+
+    xTaskCreate(sensorTask, "Sensor", 512, NULL, 2, NULL);
+
+    if constexpr (kCliEnable) {
+        xTaskCreate(uartTask, "UART", 512, NULL, 1, NULL);
+    }
+
+    vTaskStartScheduler();
+    while (1);  // heap exhaustion
     return 0;
 }
 
@@ -125,6 +163,18 @@ void RegisterCallback() {
         getDrivers().i2c1.addReceiver(stts_temp);
         getDrivers().i2c1.addReceiver(cmd);
     }
+}
+
+void SetNVICPriority() {
+    My_NVIC_SetPriority(DMA1_Stream0_IRQn, 6);  // I2C RX DMA
+    My_NVIC_SetPriority(DMA1_Stream7_IRQn, 6);  // I2C TX DMA
+    My_NVIC_SetPriority(DMA1_Stream6_IRQn, 6);  // UART TX DMA
+    My_NVIC_SetPriority(DMA1_Stream5_IRQn, 6);  // UART RX DMA
+    My_NVIC_SetPriority(USART2_IRQn, 6);        // UART
+    My_NVIC_SetPriority(I2C1_EV_IRQn, 6);       // I2C event
+    My_NVIC_SetPriority(I2C1_ER_IRQn, 6);       // I2C error
+    My_NVIC_SetPriority(TIM3_IRQn, 6);          // Timer
+    My_NVIC_SetPriority(EXTI15_10_IRQn, 7);     // Button
 }
 
 /* Interrupt Handler Function Start Here*/
@@ -179,7 +229,7 @@ void Init_Driver(Drivers& g) {
     // Manual Barrier        instructions(Assembly)
     __asm volatile("dsb 0xf" ::: "memory");
     __asm volatile("isb 0xf" ::: "memory");
-
+    SetNVICPriority();
     /* MySysTick Init*/
     g.my_systick.init();
 
@@ -194,7 +244,7 @@ void Init_Driver(Drivers& g) {
                                          .afr   = GPIO_AFR::GPIO_AF7_USART1_2};
 
     constexpr UartConfig  uart2_cfg{
-         .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
+        .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
 
     /* This DMA Config is for USART2 Tx */
     const DMA_Config hdmatx_cfg{.Peripheral      = DMA_Peripheral::USART2_TX,
@@ -237,8 +287,9 @@ void Init_Driver(Drivers& g) {
         while (1);
     }
     LOG_INFO("Booting...");
+    g.my_systick.delay_ms(10);
     LOG_INFO("USART2 Initialized");
-
+    g.my_systick.delay_ms(10);
     constexpr I2C_Config i2c_config{
         .DevNum          = I2C_DeviceNum::I2C_D1,
         .ClockFreq       = I2C_FreqHz::_100KHz,
