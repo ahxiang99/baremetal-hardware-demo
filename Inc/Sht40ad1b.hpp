@@ -13,7 +13,6 @@
 #include "drivers.hpp"
 #include "logger.hpp"
 
-
 class Sht40ad1b {
    public:
     enum class SensorState : uint8_t { IDLE, MEASURING, WAIT_DATA, DATA_READY };
@@ -35,6 +34,10 @@ class Sht40ad1b {
                 measure_start_time = getDrivers().my_systick.get_ticks();
             }
         }
+    }
+
+    bool isIdle() const {
+        return m_State == SensorState::IDLE;
     }
 
     void ProcessData() {

@@ -37,6 +37,10 @@ class Stts2h {
         }
     }
 
+    bool isIdle() const {
+        return m_State == SensorState::IDLE;
+    }
+
     void read() {
         if (m_State.load(std::memory_order_relaxed) == SensorState::IDLE) {
             if (hi2c.MemRead(devAddr, tempReg, m_data.data(), 2, 0x10U)) {
