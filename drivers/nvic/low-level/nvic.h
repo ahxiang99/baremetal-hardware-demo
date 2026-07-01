@@ -103,6 +103,14 @@ static inline void My_NVIC_DisableIRQ(int8_t IRQn) {
     }
 }
 
+/* NVIC Priority Registers base address */
+#define NVIC_IPR_BASE ((volatile uint8_t*)(0xE000E400))
+
+static inline void My_NVIC_SetPriority(IRQn_Type IRQn, uint8_t priority) {
+    /* Priority is stored in the upper 4 bits of each IPR byte on Cortex-M4 */
+    NVIC_IPR_BASE[IRQn] = (priority << 4) & 0xFF;
+}
+
 #ifdef __cplusplus
 }
 #endif
