@@ -60,18 +60,6 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
-
-    # FreeRTOS kernel sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/tasks.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/queue.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/timers.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/list.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/event_groups.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/stream_buffer.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/MemMang/heap_4.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/freertos_hooks.cpp
-
 )
 
 # Include directories for all compilers
@@ -90,8 +78,6 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F
 )
 
 # Include directories for each compiler
