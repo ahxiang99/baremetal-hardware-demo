@@ -29,6 +29,9 @@ void MySysTick::delay_ms(uint32_t ms) const {
     while ((tickCount.load(std::memory_order_relaxed) - _start) < ms);
 }
 
+extern "C" void xPortSysTickHandler(void);
+
 extern "C" void SysTick_Handler() {
+    xPortSysTickHandler();
     getDrivers().my_systick.tick();
 }

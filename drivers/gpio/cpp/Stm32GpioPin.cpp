@@ -23,7 +23,7 @@ bool Stm32GpioPin::Init(const GPIO_Config& config) {
         LOG_ERROR("GPIO Init failed: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
         return false;
     }
-    LOG_INFO("GPIO Init Success: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
+    LOG_DEBUG("GPIO Init Success: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
     return true;
 }
 

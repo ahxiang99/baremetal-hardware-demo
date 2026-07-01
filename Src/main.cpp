@@ -6,10 +6,10 @@
 #include "SensorPacket.hpp"
 #include "Sht40ad1b.hpp"
 #include "cpp/Dma.hpp"
+#include "cpp/ExtiInput.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
 #include "cpp/Stm32I2C.hpp"
-#include "cpp/Syscfg.hpp"
 #include "cpp/UartConcepts.hpp"
 #include "cpp/UartRef.hpp"
 #include "drivers.hpp"
@@ -21,7 +21,7 @@
 
 constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;
-constexpr bool            kSendPacket   = true;
+constexpr bool            kSendPacket   = !kCliEnable;
 
 static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
@@ -53,7 +53,7 @@ int main() {
         /* Timer to keep firing read command when it is elapsed.*/
         if (g.timer.isElapsed()) {
             g.gpio_led.Toggle();
-            g.timer.start(250);
+            g.timer.start(100);
             if constexpr (!kCliEnable && kSensorEnable) {
                 cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
                 cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
@@ -67,18 +67,25 @@ int main() {
             stts_temp.processData();
 
             /* Send data packet to PC via Uart2 */
-            if (g.my_systick.get_ticks() - measure_start > 300) {
-                if constexpr (kSendPacket) {
-                    PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
-                    g.uart2.send(sht40_data.raw(), sht40_data.size());
-                    PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-                    g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+            if constexpr (!kCliEnable) {
+                if (g.my_systick.get_ticks() - measure_start > 300) {
+                    if constexpr (kSendPacket) {
+                        PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
+                        g.uart2.send(sht40_data.raw(), sht40_data.size());
+                        PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+                        g.uart2.send(stts2h_data.raw(), stts2h_data.size());
 
-                } else {
-                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                    LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
+                    } else {
+                        LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                        LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
+                    }
+                    measure_start = g.my_systick.get_ticks();
                 }
-                measure_start = g.my_systick.get_ticks();
+            } else {
+                if (cmd.getState() == CliState::Completed) {
+                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                    cmd.setState(CliState::WaitingForInput);
+                }
             }
         }
 

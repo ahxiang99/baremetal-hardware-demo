@@ -30,7 +30,7 @@ struct cmd {
     void*       ctx;
 };
 
-enum class CliState { WaitingForInput, Processing, Executing };
+enum class CliState { WaitingForInput, Processing, Executing, Completed };
 
 class Cli {
    public:
@@ -108,7 +108,7 @@ class Cli {
     }
 
     void onDataReceived() {
-        setState(CliState::WaitingForInput);
+        setState(CliState::Completed);
     }
 
     void read() {}

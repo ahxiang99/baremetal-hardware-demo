@@ -48,25 +48,29 @@ set(cpu_PARAMS
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
- 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/InterruptUart.cpp 
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp 
-
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/DmaI2C.cpp
-    
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
-
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/syscfg/cpp/Syscfg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
+
+    # FreeRTOS kernel sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/tasks.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/queue.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/timers.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/list.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/event_groups.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/stream_buffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/MemMang/heap_4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/freertos_hooks.cpp
 
 )
 
@@ -74,7 +78,7 @@ set(sources_SRCS
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/syscfg
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
@@ -84,7 +88,10 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F
 )
 
 # Include directories for each compiler
