@@ -1,6 +1,8 @@
 #include "systick.hpp"
 
+#include "FreeRTOS.h"
 #include "pch.hpp"
+#include "task.h"
 
 MySysTick::MySysTick() {}
 
@@ -29,9 +31,13 @@ void MySysTick::delay_ms(uint32_t ms) const {
     while ((tickCount.load(std::memory_order_relaxed) - _start) < ms);
 }
 
-extern "C" void xPortSysTickHandler(void);
+extern "C" void                xPortSysTickHandler(void);
 
-extern "C" void SysTick_Handler() {
-    xPortSysTickHandler();
+extern "C" volatile BaseType_t xTaskSchedulerRunning;  // FreeRTOS internal flag
+
+extern "C" void                SysTick_Handler() {
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        xPortSysTickHandler();  // ← only call when scheduler is running
+    }
     getDrivers().my_systick.tick();
 }
