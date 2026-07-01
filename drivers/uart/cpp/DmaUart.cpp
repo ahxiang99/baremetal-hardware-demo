@@ -84,7 +84,7 @@ void DmaUart::initDmaRx() {
         },
         this);
 
-    hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), CHUNK_SIZE);
+    hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), BUFF_SIZE);
 }
 
 void DmaUart::enable_DMA_request() {
@@ -162,7 +162,7 @@ bool DmaUart::startNextDmaReceive() {
         RegisterUtils::setBits(uart_->CR1, USART_CR1_IDLEIE);
     }
     if (!hdmarx.is_Enabled()) {
-        hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), CHUNK_SIZE);
+        hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), BUFF_SIZE);
     }
     return true;
 }
