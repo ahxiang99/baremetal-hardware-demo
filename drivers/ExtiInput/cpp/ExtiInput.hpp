@@ -14,6 +14,7 @@ class ExtiInput {
     void initialize();
     void configure(const GPIO_Config& config);
     void handleInterrupt();
+    void setCallback(void (*fn)(void* ctx), void* ctx);
 
    private:
     void         enableClock();
@@ -25,4 +26,8 @@ class ExtiInput {
     Stm32GpioPin gpio_;
     GPIO_Config  config_;
     uint8_t      line_{};
+
+    uint32_t     m_last_press{0};
+    void (*m_callback)(void* ctx) = nullptr;
+    void* m_ctx                   = nullptr;
 };

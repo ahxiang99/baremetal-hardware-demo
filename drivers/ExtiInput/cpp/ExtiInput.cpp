@@ -2,6 +2,7 @@
 
 #include "RegisterUtils.hpp"
 #include "cpp/Stm32GpioPin.hpp"
+#include "drivers.hpp"
 #include "low-level/rcc_bitfields.h"
 #include "pch.hpp"
 
@@ -36,8 +37,18 @@ void ExtiInput::handleInterrupt() {
     const uint32_t PR = EXTI_instance->PR;
     if (PR & (1U << 13)) {
         RegisterUtils::setBits(EXTI_instance->PR, (1U << 13));
+
+        uint32_t now = getDrivers().my_systick.get_ticks();
+        if (now - m_last_press > 200) {
+            m_last_press = now;
+            if (m_callback) m_callback(m_ctx);
+        }
     }
 }
 void ExtiInput::configureNvic() {
     My_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+void ExtiInput::setCallback(void (*fn)(void*), void* ctx) {
+    m_callback = fn;
+    m_ctx      = ctx;
 }
