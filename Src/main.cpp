@@ -18,6 +18,9 @@
 #include "low-level/rcc_bitfields.h"
 #include "low-level/syscfg_registers.h"
 #include "pch.hpp"
+#include "portmacro.h"
+#include "projdefs.h"
+#include "semphr.h"
 #include "stts2h.hpp"
 #include "task.h"
 
@@ -32,7 +35,6 @@ Sht40ad1b        temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
 Stts2h           stts_temp(I2C_Ref::from(getDrivers().i2c1));
 Cli              cmd;
 std::atomic_bool g_cmd_complete{true};
-
 /* Function Prototype */
 void Init_Driver(Drivers& g);
 void SetNVICPriority();
@@ -48,7 +50,59 @@ void ledTask(void* params) {
     }
 }
 
+void sht40_Task(void* params) {
+    SemaphoreHandle_t       mutex         = static_cast<SemaphoreHandle_t>(params);
+    Drivers&                g             = getDrivers();
+    TickType_t              xLastWakeTime = xTaskGetTickCount();
+    static std::atomic_bool cmd_complete{true};
+
+    while (1) {
+        xSemaphoreTake(mutex, portMAX_DELAY);  // <- This Line Step Over, Go to Hardfault
+
+        temp_sensor.read();
+        g.i2c1.complete_flag_ = &cmd_complete;
+        g_cmd_complete.store(false, std::memory_order_relaxed);
+        while (!temp_sensor.isIdle()) {
+            g.i2c1.processRx();
+            temp_sensor.ProcessData();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        xSemaphoreGive(mutex);
+        PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
+        g.uart2.send(sht40_data.raw(), sht40_data.size());
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(300));
+    }
+}
+
+void stts2h_Task(void* params) {
+    SemaphoreHandle_t       mutex         = static_cast<SemaphoreHandle_t>(params);
+    Drivers&                g             = getDrivers();
+    TickType_t              xLastWakeTime = xTaskGetTickCount();
+    static std::atomic_bool cmd_complete{true};
+
+    while (1) {
+        xSemaphoreTake(mutex, portMAX_DELAY);
+
+        g.i2c1.complete_flag_ = &cmd_complete;
+        g_cmd_complete.store(false, std::memory_order_relaxed);
+        stts_temp.read();
+
+        while (!stts_temp.isIdle()) {
+            g.i2c1.processRx();
+            stts_temp.processData();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        xSemaphoreGive(mutex);
+        PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+        g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+    }
+}
+
 // Task 1 — sensorTask: owns I2C + sensor reading + packet sending
+
 void sensorTask(void* params) {
     Drivers&                      g = getDrivers();
     SpscRingBuffer<I2CCommand, 4> cmd_queue;
@@ -133,15 +187,25 @@ void uartTask(void* params) {
 int main() {
     Drivers& g = getDrivers();
     Init_Driver(g);
+
     RegisterCallback();
     stts_temp.initialize();
 
-    xTaskCreate(ledTask, "LED", 256, NULL, 4, NULL);
+    SemaphoreHandle_t i2c_mutex = xSemaphoreCreateMutex();
+    if (i2c_mutex == NULL) {
+        // Heap exhausted — can't create mutex
+        __asm volatile("bkpt #0");
+        while (1);
+    }
 
-    xTaskCreate(sensorTask, "Sensor", 512, NULL, 2, NULL);
+    xTaskCreate(ledTask, "LED", 1024, i2c_mutex, 5, NULL);
+
+    xTaskCreate(sht40_Task, "Sht40", 1024, i2c_mutex, 3, NULL);
+
+    xTaskCreate(stts2h_Task, "Stts2h", 1024, i2c_mutex, 2, NULL);
 
     if constexpr (kCliEnable) {
-        xTaskCreate(uartTask, "UART", 512, NULL, 1, NULL);
+        xTaskCreate(uartTask, "UART", 1024, NULL, 1, NULL);
     }
 
     vTaskStartScheduler();
@@ -216,10 +280,19 @@ extern "C" void EXTI15_10_IRQHandler(void) {
 }
 
 extern "C" void HardFault_Handler(void) {
-    /* Put a breakpoint on the line below */
+    // SCB registers — Cortex-M4 System Control Block
+    volatile uint32_t hfsr = *reinterpret_cast<volatile uint32_t*>(0xE000ED2C);  // Hard Fault Status
+    volatile uint32_t cfsr = *reinterpret_cast<volatile uint32_t*>(0xE000ED28);  // Configurable Fault Status
+    volatile uint32_t bfar = *reinterpret_cast<volatile uint32_t*>(0xE000ED38);  // Bus Fault Address
+    volatile uint32_t mmar = *reinterpret_cast<volatile uint32_t*>(0xE000ED34);  // MemManage Fault Address
+    volatile uint32_t lr   = 0;
+    __asm volatile("mov %0, lr" : "=r"(lr));  // link register — tells which context
+    (void)hfsr;
+    (void)cfsr;
+    (void)bfar;
+    (void)mmar;
     volatile int loop = 1;
     while (loop) {
-        // If the debugger stops here, a HardFault occurred!
     }
 }
 
@@ -229,6 +302,7 @@ void Init_Driver(Drivers& g) {
     // Manual Barrier        instructions(Assembly)
     __asm volatile("dsb 0xf" ::: "memory");
     __asm volatile("isb 0xf" ::: "memory");
+
     SetNVICPriority();
     /* MySysTick Init*/
     g.my_systick.init();

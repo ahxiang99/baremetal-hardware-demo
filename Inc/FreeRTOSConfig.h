@@ -8,7 +8,7 @@
 #define configMAX_PRIORITIES 5
 #define configMINIMAL_STACK_SIZE 128
 #define configMAX_TASK_NAME_LEN 16
-#define configTOTAL_HEAP_SIZE (10 * 1024)
+#define configTOTAL_HEAP_SIZE (20 * 1024)
 #define configIDLE_SHOULD_YIELD 1
 #define configUSE_MALLOC_FAILED_HOOK 1
 
@@ -54,5 +54,6 @@
 #define INCLUDE_xTaskGetCurrentTaskHandle 1
 #define INCLUDE_xTaskGetSchedulerState 1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
+#define INCLUDE_xSemaphoreGetMutexHolder 1
 
 #endif /* FREERTOS_CONFIG_H */
