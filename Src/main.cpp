@@ -1,5 +1,6 @@
 #include <atomic>
 
+#include "AppMode.hpp"
 #include "FreeRTOS.h"
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
@@ -24,17 +25,17 @@
 #include "stts2h.hpp"
 #include "task.h"
 
-constexpr bool            kCliEnable    = false;
 constexpr bool            kSensorEnable = true;
-constexpr bool            kSendPacket   = true;
 
 static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
 // Global Variables
-Sht40ad1b        temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
-Stts2h           stts_temp(I2C_Ref::from(getDrivers().i2c1));
-Cli              cmd;
-std::atomic_bool g_cmd_complete{true};
+Sht40ad1b            temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
+Stts2h               stts_temp(I2C_Ref::from(getDrivers().i2c1));
+Cli                  cmd;
+std::atomic_bool     g_cmd_complete{true};
+std::atomic<AppMode> g_AppMode{AppMode::Console};
+
 /* Function Prototype */
 void Init_Driver(Drivers& g);
 void SetNVICPriority();
@@ -58,10 +59,13 @@ void sht40_Task(void* params) {
 
     while (1) {
         xSemaphoreTake(mutex, portMAX_DELAY);  // <- This Line Step Over, Go to Hardfault
-
-        temp_sensor.read();
         g.i2c1.complete_flag_ = &cmd_complete;
         g_cmd_complete.store(false, std::memory_order_relaxed);
+
+        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
+            temp_sensor.read();
+        }
+
         while (!temp_sensor.isIdle()) {
             g.i2c1.processRx();
             temp_sensor.ProcessData();
@@ -69,8 +73,29 @@ void sht40_Task(void* params) {
         }
 
         xSemaphoreGive(mutex);
-        PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
-        g.uart2.send(sht40_data.raw(), sht40_data.size());
+
+        const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
+        switch (curMode) {
+            case AppMode::SendPacket: {
+                PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
+                g.uart2.send(sht40_data.raw(), sht40_data.size());
+                break;
+            }
+            case AppMode::Console:
+                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
+                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                }
+                break;
+            case AppMode::CliMode:
+                if (cmd.getState() == CliState::Completed) {
+                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                    cmd.setState(CliState::WaitingForInput);
+                }
+                break;
+            case AppMode::COUNT:
+                break;
+        }
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(300));
     }
 }
@@ -86,7 +111,10 @@ void stts2h_Task(void* params) {
 
         g.i2c1.complete_flag_ = &cmd_complete;
         g_cmd_complete.store(false, std::memory_order_relaxed);
-        stts_temp.read();
+
+        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
+            stts_temp.read();
+        }
 
         while (!stts_temp.isIdle()) {
             g.i2c1.processRx();
@@ -95,8 +123,29 @@ void stts2h_Task(void* params) {
         }
 
         xSemaphoreGive(mutex);
-        PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-        g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+        const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
+        switch (curMode) {
+            case AppMode::SendPacket: {
+                PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+                g.uart2.send(stts2h_data.raw(), stts2h_data.size());
+                break;
+            }
+            case AppMode::Console:
+                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
+                    LOG_PRINT("STTS2H: Temp:{}", stts_temp.getTemp());
+                }
+                break;
+            case AppMode::CliMode:
+                if (cmd.getState() == CliState::Completed) {
+                    LOG_PRINT("STTS2H: Temp:{}", stts_temp.getTemp());
+                    cmd.setState(CliState::WaitingForInput);
+                }
+                break;
+
+            case AppMode::COUNT:
+                break;
+        }
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
     }
 }
@@ -108,7 +157,7 @@ void sensorTask(void* params) {
     SpscRingBuffer<I2CCommand, 4> cmd_queue;
     while (1) {
         /* Timer to keep firing read command when it is elapsed.*/
-        if constexpr (!kCliEnable && kSensorEnable) {
+        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
             cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
             cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
         }
@@ -128,9 +177,7 @@ void sensorTask(void* params) {
                 // Both sensors idle = current command fully complete:
                 bool sht40_idle  = temp_sensor.isIdle();
                 bool stts2h_idle = stts_temp.isIdle();
-
                 if (sht40_idle && stts2h_idle) break;
-
                 // Done when complete_flag is true AND no more I2C activity:
                 if (g_cmd_complete.load(std::memory_order_acquire)) {
                     sensor_done = true;
@@ -141,22 +188,19 @@ void sensorTask(void* params) {
 
         if constexpr (kSensorEnable) {
             /* Send data packet to PC via Uart2 */
-            if constexpr (kSendPacket) {
+            if (g_AppMode.load(std::memory_order_relaxed) == AppMode::SendPacket) {
                 PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
                 g.uart2.send(sht40_data.raw(), sht40_data.size());
                 PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
                 g.uart2.send(stts2h_data.raw(), stts2h_data.size());
-            } else {
+            } else if (g_AppMode.load(std::memory_order_relaxed) == AppMode::Console) {
                 if (temp_sensor.getState() == Sht40ad1b::SensorState::IDLE) {
                     LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                 }
                 if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
                     LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
                 }
-            }
-
-            if constexpr (!kCliEnable) {
-            } else {
+            } else if (g_AppMode.load(std::memory_order_relaxed) == AppMode::CliMode) {
                 if (cmd.getState() == CliState::Completed) {
                     LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                     cmd.setState(CliState::WaitingForInput);
@@ -171,7 +215,7 @@ void sensorTask(void* params) {
 void uartTask(void* params) {
     /* Command Line Interface Input Processing */
     while (1) {
-        if constexpr (kCliEnable) {
+        if (g_AppMode.load(std::memory_order_relaxed) == AppMode::CliMode) {
             Drivers& g = getDrivers();
             g.uart2.processRx();
             if (cmd.getState() == CliState::WaitingForInput) {
@@ -198,15 +242,13 @@ int main() {
         while (1);
     }
 
-    xTaskCreate(ledTask, "LED", 1024, i2c_mutex, 5, NULL);
+    xTaskCreate(ledTask, "LED", 1024, NULL, 4, NULL);
 
-    xTaskCreate(sht40_Task, "Sht40", 1024, i2c_mutex, 3, NULL);
+    xTaskCreate(uartTask, "UART", 1024, NULL, 3, NULL);
 
-    xTaskCreate(stts2h_Task, "Stts2h", 1024, i2c_mutex, 2, NULL);
+    xTaskCreate(sht40_Task, "Sht40", 1024, i2c_mutex, 2, NULL);
 
-    if constexpr (kCliEnable) {
-        xTaskCreate(uartTask, "UART", 1024, NULL, 1, NULL);
-    }
+    xTaskCreate(stts2h_Task, "Stts2h", 1024, i2c_mutex, 1, NULL);
 
     vTaskStartScheduler();
     while (1);  // heap exhaustion
@@ -216,17 +258,17 @@ int main() {
 /* Function Body */
 
 void RegisterCallback() {
-    if constexpr (kCliEnable) {
-        getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
-        cmd.setUart(UartRef::from(getDrivers().uart2));
-        cmd.setSensor(&temp_sensor);
-    }
+    getDrivers().uart2.onDataReceived([](void* ctx, const uint8_t* data, size_t len) { static_cast<Cli*>(ctx)->onUartData(data, len); }, &cmd);
+    cmd.setUart(UartRef::from(getDrivers().uart2));
+    cmd.setSensor(&temp_sensor);
 
     if constexpr (kSensorEnable) {
         getDrivers().i2c1.addReceiver(temp_sensor);
         getDrivers().i2c1.addReceiver(stts_temp);
         getDrivers().i2c1.addReceiver(cmd);
     }
+
+    getDrivers().gpio_button.setCallback(onButtonPress, &g_AppMode);
 }
 
 void SetNVICPriority() {
@@ -317,8 +359,7 @@ void Init_Driver(Drivers& g) {
                                          .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
                                          .afr   = GPIO_AFR::GPIO_AF7_USART1_2};
 
-    constexpr UartConfig  uart2_cfg{
-        .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
+    constexpr UartConfig  uart2_cfg{.dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = UartComm::RX_TX, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
 
     /* This DMA Config is for USART2 Tx */
     const DMA_Config hdmatx_cfg{.Peripheral      = DMA_Peripheral::USART2_TX,
