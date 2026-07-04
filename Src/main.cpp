@@ -31,7 +31,7 @@ static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(
 
 // Global Variables
 Sht40ad1b            temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
-Stts2h               stts_temp(I2C_Ref::from(getDrivers().i2c1));
+Stts2h               stts_temp(I2C_Ref::from(getDrivers().i2c1), Stts2h::SensorMode::ONE_SHOT);
 Cli                  cmd;
 std::atomic_bool     g_cmd_complete{true};
 std::atomic<AppMode> g_AppMode{AppMode::Console};
