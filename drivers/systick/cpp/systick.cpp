@@ -1,16 +1,17 @@
 #include "systick.hpp"
 
 #include "FreeRTOS.h"
+#include "drivers.hpp"
 #include "pch.hpp"
 #include "task.h"
 
-MySysTick::MySysTick() {}
+MySysTick::MySysTick() : Instance(SysTick) {}
 
 void MySysTick::init() {
     // Construct 1ms heartbeat
-    SysTick->LOAD = (HSI_Freq_Hz / 1000) - 1;  // Set reload register
-    SysTick->VAL  = 0;                         // Clear current value register
-    SysTick->CTRL = 0x07U;                     // Enable SysTick, use processor clock, no interrupt
+    Instance->LOAD = (getDrivers().sysclock.getSysClock().sysclk / 1000) - 1;  // Set reload register
+    Instance->VAL  = 0;                                                        // Clear current value register
+    Instance->CTRL = 0x07U;                                                    // Enable SysTick, use processor clock, no interrupt
     My_NVIC_EnableIRQ(15);
 }
 
