@@ -7,15 +7,18 @@
 #include "cpp/Stm32Rcc.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
+#include "cpp/wwdg.hpp"
+#include "wwdg/cpp/wwdg.hpp"
 
 struct Drivers {
-    MySysTick    my_systick;
-    SysClock     sysclock;
-    Stm32GpioPin gpio_led;
-    ExtiInput    gpio_button;
-    DmaUart      uart2;
-    Stm32Timer   timer;
-    DmaI2C       i2c1;
+    MySysTick      my_systick;
+    SysClock       sysclock;
+    Stm32GpioPin   gpio_led;
+    ExtiInput      gpio_button;
+    DmaUart        uart2;
+    Stm32Timer     timer;
+    DmaI2C         i2c1;
+    WindowWatchDog wwdg;
 };
 
 Drivers& getDrivers();
