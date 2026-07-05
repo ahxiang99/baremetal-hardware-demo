@@ -4,11 +4,13 @@
 #include "cpp/DmaUart.hpp"
 #include "cpp/ExtiInput.hpp"
 #include "cpp/Gpio.hpp"
+#include "cpp/Stm32Rcc.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
 
 struct Drivers {
     MySysTick    my_systick;
+    SysClock     sysclock;
     Stm32GpioPin gpio_led;
     ExtiInput    gpio_button;
     DmaUart      uart2;

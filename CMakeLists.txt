@@ -55,11 +55,12 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/DmaI2C.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
+
 
     # FreeRTOS kernel sources
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/tasks.c
@@ -87,7 +88,9 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/include
