@@ -16,7 +16,7 @@ enum class UartInitError : uint8_t { NullPeripheral, InvalidBaudRate, InvalidCon
 
 enum class UartNum : uint8_t { USART_D1, USART_D2, USART_D6, Dev_Total };
 
-enum class UartBaudRate : uint16_t { _9600 = 0x683, _115200 = 0x008B };
+enum class UartBaudRate : uint32_t { _9600 = 9600, _115200 = 115200 };
 
 enum class UartComm : uint8_t { RX_ONLY, TX_ONLY, RX_TX };
 

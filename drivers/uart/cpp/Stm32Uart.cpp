@@ -14,6 +14,12 @@ static const peripherals_regs_table<USART_TypeDef> uart_table[static_cast<uint8_
     {USART6, RCC_APB2ENR_USART6_EN, RCC_APB2RSTR_USART6_RST}
 };
 
+uint32_t BaudRateCalc(uint32_t baud, uint32_t fck, uint32_t over) {
+    float_t nom_usart = (float_t)fck / (float_t)(8U * (2 - over) * baud);
+    float_t div_usart = ceilf((nom_usart - (uint32_t)nom_usart) * 16);
+    return (uint32_t)nom_usart << 4 | (uint32_t)div_usart << 0;
+}
+
 Stm32Uart::Stm32Uart() {}
 
 Stm32Uart::Stm32Uart(const UartConfig& config) : config_(config) {
@@ -94,7 +100,21 @@ bool Stm32Uart::receive(uint8_t* buffer, size_t DataLength) {
 }
 
 void Stm32Uart::configureBaudRate() {
-    uart_->BRR = static_cast<uint32_t>(config_.baudRate);
+    uint32_t baudReg = 0;
+    switch (config_.dev_num) {
+        case UartNum::USART_D1:
+        case UartNum::USART_D6:
+            baudReg = BaudRateCalc(static_cast<uint32_t>(config_.baudRate), getDrivers().sysclock.getSysClock().apb2, 0);
+            break;
+
+        case UartNum::USART_D2:
+            baudReg = BaudRateCalc(static_cast<uint32_t>(config_.baudRate), getDrivers().sysclock.getSysClock().apb1, 0);
+            break;
+        default:
+            error_ = UartError::InvalidConfig;
+            return;
+    }
+    uart_->BRR = baudReg;
 }
 
 void Stm32Uart::configureParity() {
