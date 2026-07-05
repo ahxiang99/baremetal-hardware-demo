@@ -47,6 +47,7 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/TaskMonitoring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
@@ -59,6 +60,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
 
 
