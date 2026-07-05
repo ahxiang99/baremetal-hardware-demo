@@ -2,7 +2,7 @@
 #define FREERTOS_CONFIG_H
 
 /* Hardware specifics for STM32F401 */
-#define configCPU_CLOCK_HZ 16000000UL
+#define configCPU_CLOCK_HZ 84000000UL
 #define configTICK_RATE_HZ 1000
 #define configTICK_TYPE_WIDTH_IN_BITS TICK_TYPE_WIDTH_32_BITS
 #define configMAX_PRIORITIES 5

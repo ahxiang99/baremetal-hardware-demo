@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include <atomic>
 
 #include "AppMode.hpp"
@@ -12,6 +14,7 @@
 #include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
 #include "cpp/Stm32I2C.hpp"
+#include "cpp/Stm32Rcc.hpp"
 #include "cpp/UartConcepts.hpp"
 #include "cpp/UartRef.hpp"
 #include "drivers.hpp"
@@ -345,12 +348,25 @@ void Init_Driver(Drivers& g) {
     __asm volatile("dsb 0xf" ::: "memory");
     __asm volatile("isb 0xf" ::: "memory");
 
+    /* Enable SysClock */
+    constexpr SysClockConfig sys_cfg_84{
+        SysClockSource::PLL, {HSI_Freq_Hz, 8, 84, 2},
+         AHB_ClockDivision::DIV_1, APB_ClockDivision::DIV_2, APB_ClockDivision::DIV_1, 3
+    };
+    static_assert(isValidPllConfig(sys_cfg_84.PllCfg), "PLL config invalid");
+    constexpr ClockTree trial_clock = calcClockTree_v2(sys_cfg_84);
+    // Validate peripheral clocks:
+    static_assert(trial_clock.sysclk == 84'000'000, "SYSCLK must be 84MHz");
+    static_assert(trial_clock.apb1 <= 42'000'000, "APB1 overclock!");
+    static_assert(trial_clock.apb2 <= 84'000'000, "APB2 overclock!");
+
+    g.sysclock.initialize(sys_cfg_84, trial_clock);
+
     SetNVICPriority();
     /* MySysTick Init*/
     g.my_systick.init();
 
     /* Configure Uart2 Pin */
-
     constexpr GPIO_Config uart2_gpio_cfg{.pin   = GPIO_PIN_2 | GPIO_PIN_3,
                                          .port  = GPIO_Port::GPIO_PA,
                                          .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
