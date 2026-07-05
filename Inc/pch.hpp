@@ -16,11 +16,13 @@
 #include <string_view>
 
 /* Define ConstantExpr */
-const size_t   CHUNK_SIZE  = 64;
-const size_t   BUFF_SIZE   = 128;
-const uint32_t HSI_Freq_Hz = 16000000;
+constexpr size_t   CHUNK_SIZE    = 64;
+constexpr size_t   BUFF_SIZE     = 128;
+constexpr uint32_t HSI_Freq_Hz   = 16000000;
+constexpr bool     kSensorEnable = true;
 
 /* Custom C++ Library */
+#include "AppMode.hpp"
 #include "FloatIntExtraction.hpp"
 #include "Middleware/logger.hpp"
 #include "RegisterUtils.hpp"
@@ -28,6 +30,9 @@ const uint32_t HSI_Freq_Hz = 16000000;
 #include "drivers.hpp"
 
 /* Custom C Library */
+#include "FreeRTOS.h"
 #include "bit_utils.h"
 #include "cmsis.h"
 #include "low-level/nvic.h"
+#include "semphr.h"
+#include "task.h"
