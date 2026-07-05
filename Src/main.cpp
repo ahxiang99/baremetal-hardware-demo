@@ -1,36 +1,11 @@
-#include <assert.h>
-
-#include <atomic>
-
-#include "AppMode.hpp"
-#include "FreeRTOS.h"
-#include "Middleware/cli.hpp"
-#include "Middleware/logger.hpp"
-#include "RingBuffer.hpp"
-#include "SensorPacket.hpp"
 #include "Sht40ad1b.hpp"
-#include "cpp/Dma.hpp"
-#include "cpp/ExtiInput.hpp"
-#include "cpp/II2C.hpp"
-#include "cpp/Stm32GpioPin.hpp"
-#include "cpp/Stm32I2C.hpp"
-#include "cpp/Stm32Rcc.hpp"
-#include "cpp/UartConcepts.hpp"
-#include "cpp/UartRef.hpp"
-#include "drivers.hpp"
-#include "low-level/nvic.h"
-#include "low-level/rcc_bitfields.h"
-#include "low-level/syscfg_registers.h"
+#include "TaskMonitoring.hpp"
+#include "cli.hpp"
 #include "pch.hpp"
-#include "portmacro.h"
-#include "projdefs.h"
 #include "semphr.h"
 #include "stts2h.hpp"
-#include "task.h"
 
-constexpr bool            kSensorEnable = true;
-
-static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
+static volatile uint32_t& CPACR = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
 // Global Variables
 Sht40ad1b            temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
@@ -43,192 +18,6 @@ std::atomic<AppMode> g_AppMode{AppMode::Console};
 void Init_Driver(Drivers& g);
 void SetNVICPriority();
 void RegisterCallback();
-
-void ledTask(void* params) {
-    Drivers&         g             = getDrivers();
-    TickType_t       xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xPeriod       = pdMS_TO_TICKS(100);
-    while (1) {
-        g.gpio_led.Toggle();
-        vTaskDelayUntil(&xLastWakeTime, xPeriod);  // replaces g.timer.start(100)
-    }
-}
-
-void sht40_Task(void* params) {
-    SemaphoreHandle_t       mutex         = static_cast<SemaphoreHandle_t>(params);
-    Drivers&                g             = getDrivers();
-    TickType_t              xLastWakeTime = xTaskGetTickCount();
-    static std::atomic_bool cmd_complete{true};
-
-    while (1) {
-        xSemaphoreTake(mutex, portMAX_DELAY);  // <- This Line Step Over, Go to Hardfault
-        g.i2c1.complete_flag_ = &cmd_complete;
-        g_cmd_complete.store(false, std::memory_order_relaxed);
-
-        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
-            temp_sensor.read();
-        }
-
-        while (!temp_sensor.isIdle()) {
-            g.i2c1.processRx();
-            temp_sensor.ProcessData();
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-
-        xSemaphoreGive(mutex);
-
-        const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
-        switch (curMode) {
-            case AppMode::SendPacket: {
-                PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
-                g.uart2.send(sht40_data.raw(), sht40_data.size());
-                break;
-            }
-            case AppMode::Console:
-                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
-                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                }
-                break;
-            case AppMode::CliMode:
-                if (cmd.getState() == CliState::Completed) {
-                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                    cmd.setState(CliState::WaitingForInput);
-                }
-                break;
-            case AppMode::COUNT:
-                break;
-        }
-
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(300));
-    }
-}
-
-void stts2h_Task(void* params) {
-    SemaphoreHandle_t       mutex         = static_cast<SemaphoreHandle_t>(params);
-    Drivers&                g             = getDrivers();
-    TickType_t              xLastWakeTime = xTaskGetTickCount();
-    static std::atomic_bool cmd_complete{true};
-
-    while (1) {
-        xSemaphoreTake(mutex, portMAX_DELAY);
-
-        g.i2c1.complete_flag_ = &cmd_complete;
-        g_cmd_complete.store(false, std::memory_order_relaxed);
-
-        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
-            stts_temp.read();
-        }
-
-        while (!stts_temp.isIdle()) {
-            g.i2c1.processRx();
-            stts_temp.processData();
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-
-        xSemaphoreGive(mutex);
-        const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
-        switch (curMode) {
-            case AppMode::SendPacket: {
-                PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-                g.uart2.send(stts2h_data.raw(), stts2h_data.size());
-                break;
-            }
-            case AppMode::Console:
-                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
-                    LOG_PRINT("STTS2H: Temp:{}", stts_temp.getTemp());
-                }
-                break;
-            case AppMode::CliMode:
-                if (cmd.getState() == CliState::Completed) {
-                    LOG_PRINT("STTS2H: Temp:{}", stts_temp.getTemp());
-                    cmd.setState(CliState::WaitingForInput);
-                }
-                break;
-
-            case AppMode::COUNT:
-                break;
-        }
-
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
-    }
-}
-
-// Task 1 — sensorTask: owns I2C + sensor reading + packet sending
-
-void sensorTask(void* params) {
-    Drivers&                      g = getDrivers();
-    SpscRingBuffer<I2CCommand, 4> cmd_queue;
-    while (1) {
-        /* Timer to keep firing read command when it is elapsed.*/
-        if (g_AppMode.load(std::memory_order_relaxed) != AppMode::CliMode) {
-            cmd_queue.push({[](void* ctx) { static_cast<Sht40ad1b*>(ctx)->read(); }, &temp_sensor});
-            cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
-        }
-
-        /* Command Queue */
-        I2CCommand icmd;
-        while (cmd_queue.pop(icmd)) {
-            g_cmd_complete.store(false, std::memory_order_relaxed);
-            getDrivers().i2c1.complete_flag_ = &g_cmd_complete;
-            icmd.fn(icmd.ctx);  // Read Call
-
-            bool sensor_done = false;
-            while (!sensor_done) {
-                g.i2c1.processRx();
-                temp_sensor.ProcessData();  // State is not update
-                stts_temp.processData();
-                // Both sensors idle = current command fully complete:
-                bool sht40_idle  = temp_sensor.isIdle();
-                bool stts2h_idle = stts_temp.isIdle();
-                if (sht40_idle && stts2h_idle) break;
-                // Done when complete_flag is true AND no more I2C activity:
-                if (g_cmd_complete.load(std::memory_order_acquire)) {
-                    sensor_done = true;
-                }
-                vTaskDelay(pdMS_TO_TICKS(10));  // yield while polling
-            }
-        }
-
-        if constexpr (kSensorEnable) {
-            /* Send data packet to PC via Uart2 */
-            if (g_AppMode.load(std::memory_order_relaxed) == AppMode::SendPacket) {
-                PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
-                g.uart2.send(sht40_data.raw(), sht40_data.size());
-                PacketV2<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-                g.uart2.send(stts2h_data.raw(), stts2h_data.size());
-            } else if (g_AppMode.load(std::memory_order_relaxed) == AppMode::Console) {
-                if (temp_sensor.getState() == Sht40ad1b::SensorState::IDLE) {
-                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                }
-                if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
-                    LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
-                }
-            } else if (g_AppMode.load(std::memory_order_relaxed) == AppMode::CliMode) {
-                if (cmd.getState() == CliState::Completed) {
-                    LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
-                    cmd.setState(CliState::WaitingForInput);
-                }
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(500));  // ← yield while waiting
-    }
-}
-
-// Task 2 — uartTask: owns CLI input (only when kCliEnable = true)
-void uartTask(void* params) {
-    /* Command Line Interface Input Processing */
-    while (1) {
-        if (g_AppMode.load(std::memory_order_relaxed) == AppMode::CliMode) {
-            Drivers& g = getDrivers();
-            g.uart2.processRx();
-            if (cmd.getState() == CliState::WaitingForInput) {
-                cmd.get_input();
-                cmd.setState(CliState::Processing);
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
 
 /* Main Program Start Here */
 int main() {
@@ -244,6 +33,8 @@ int main() {
         __asm volatile("bkpt #0");
         while (1);
     }
+
+    xTaskCreate(wwdgTask, "WWDG", 512, NULL, 5, NULL);
 
     xTaskCreate(ledTask, "LED", 1024, NULL, 4, NULL);
 
@@ -348,13 +139,15 @@ void Init_Driver(Drivers& g) {
     __asm volatile("dsb 0xf" ::: "memory");
     __asm volatile("isb 0xf" ::: "memory");
 
-    /* Enable SysClock */
+    /* Configure MCU Frequency */
     constexpr SysClockConfig sys_cfg_84{
         SysClockSource::PLL, {HSI_Freq_Hz, 8, 84, 2},
          AHB_ClockDivision::DIV_1, APB_ClockDivision::DIV_2, APB_ClockDivision::DIV_1, 3
     };
+
     static_assert(isValidPllConfig(sys_cfg_84.PllCfg), "PLL config invalid");
     constexpr ClockTree trial_clock = calcClockTree_v2(sys_cfg_84);
+
     // Validate peripheral clocks:
     static_assert(trial_clock.sysclk == 84'000'000, "SYSCLK must be 84MHz");
     static_assert(trial_clock.apb1 <= 42'000'000, "APB1 overclock!");
@@ -464,6 +257,9 @@ void Init_Driver(Drivers& g) {
     /* GPIO C Pin 13 */
     g.gpio_button.configure(gpio_button_cfg);
     g.gpio_button.initialize();
+
+    /* Init Watch Dog */
+    g.wwdg.initialize();
 
     LOG_INFO("Initialized Done...");
 }
