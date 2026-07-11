@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "logger.hpp"
+#include "RegisterUtils.hpp"
 #include "low-level/gpio_registers.h"
 #include "pch.hpp"
 
@@ -20,10 +20,8 @@ bool Stm32GpioPin::Init(const GPIO_Config& config) {
     gpio_   = gpio_table[static_cast<uint8_t>(config_.port)].instance;
     enableGpioClock();
     if (!configurePin()) {
-        LOG_ERROR("GPIO Init failed: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
         return false;
     }
-    LOG_DEBUG("GPIO Init Success: port={} pin={}", static_cast<uint32_t>(config_.port), config_.pin);
     return true;
 }
 
