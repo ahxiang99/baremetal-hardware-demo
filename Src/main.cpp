@@ -1,6 +1,10 @@
 #include "Sht40ad1b.hpp"
 #include "TaskMonitoring.hpp"
 #include "cli.hpp"
+#include "cpp/Stm32GpioPin.hpp"
+#include "cpp/Stm32I2C.hpp"
+#include "cpp/Stm32Spi.hpp"
+#include "oled_SSD1306.hpp"
 #include "pch.hpp"
 #include "semphr.h"
 #include "stts2h.hpp"
@@ -21,7 +25,8 @@ void RegisterCallback();
 
 /* Main Program Start Here */
 int main() {
-    Drivers& g = getDrivers();
+    *reinterpret_cast<volatile uint32_t*>(0xE000ED08) = 0x08004000;
+    Drivers& g                                        = getDrivers();
     Init_Driver(g);
 
     RegisterCallback();
@@ -38,13 +43,14 @@ int main() {
 
     xTaskCreate(ledTask, "LED", 1024, NULL, 4, NULL);
 
-    xTaskCreate(uartTask, "UART", 1024, NULL, 3, NULL);
+    xTaskCreate(uartTask, "UART", 256, NULL, 3, NULL);
 
     xTaskCreate(sht40_Task, "Sht40", 1024, i2c_mutex, 2, NULL);
 
     xTaskCreate(stts2h_Task, "Stts2h", 1024, i2c_mutex, 1, NULL);
 
     vTaskStartScheduler();
+
     while (1);  // heap exhaustion
     return 0;
 }
@@ -197,12 +203,21 @@ void Init_Driver(Drivers& g) {
 
     };
 
+    /* Configure spi1 : To use PB3 SPI_SCK, PB4 SPI1_MISO, PB5 SPI_MOSI */
+    constexpr GPIO_Config spi1_gpio_config{.pin   = GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5,
+                                           .port  = GPIO_Port::GPIO_PB,
+                                           .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
+                                           .otype = GPIO_OType::GPIO_OTYPER_PP,
+                                           .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+                                           .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
+                                           .afr   = GPIO_AFR::GPIO_AF5_SPI};
+
     /* Logger Init */
     Logger::Init(UartRef::from(g.uart2));
     Logger::set_level(LogLevel::INFO);
 
     Stm32GpioPin temp;
-    Startup(temp, uart2_gpio_cfg, i2c1_gpio_config);
+    Startup(temp, uart2_gpio_cfg, i2c1_gpio_config, spi1_gpio_config);
 
     /* Configure Uart */
     g.uart2.configure(uart2_cfg, hdmatx_cfg, hdmarx_cfg);
@@ -258,8 +273,19 @@ void Init_Driver(Drivers& g) {
     g.gpio_button.configure(gpio_button_cfg);
     g.gpio_button.initialize();
 
-    /* Init Watch Dog */
-    g.wwdg.initialize();
+    /* SPI1 Config */
+    Stm32Spi::Config spi_cfg{.dev               = Stm32Spi::SpiDev::SPI_D1,
+                             .mode              = Stm32Spi::Mode::Master,
+                             .cpol              = Stm32Spi::ClockPolarity::IdleLow,
+                             .cpha              = Stm32Spi::ClockPhase::FirstEdge,
+                             .dataSize          = Stm32Spi::DataSize::Bits8,
+                             .bitOrder          = Stm32Spi::BitOrder::MsbFirst,
+                             .baudRatePrescalar = 5,
+                             .nssSoftware       = true};
+
+    g.spi1.initialize(spi_cfg);
+
+    g.disp.Initialize(g.spi1);
 
     LOG_INFO("Initialized Done...");
 }
