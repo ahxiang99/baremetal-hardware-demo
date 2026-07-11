@@ -62,6 +62,9 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306/oled_SSD1306.cpp
 
 
     # FreeRTOS kernel sources
@@ -94,6 +97,8 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/include
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F

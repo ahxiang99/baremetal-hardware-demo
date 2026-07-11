@@ -5,9 +5,11 @@
 #include "cpp/ExtiInput.hpp"
 #include "cpp/Gpio.hpp"
 #include "cpp/Stm32Rcc.hpp"
+#include "cpp/Stm32Spi.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
 #include "cpp/wwdg.hpp"
+#include "oled_SSD1306.hpp"
 #include "wwdg/cpp/wwdg.hpp"
 
 struct Drivers {
@@ -19,6 +21,8 @@ struct Drivers {
     Stm32Timer     timer;
     DmaI2C         i2c1;
     WindowWatchDog wwdg;
+    Stm32Spi       spi1;
+    OLED_Display   disp;
 };
 
 Drivers& getDrivers();
