@@ -1,9 +1,17 @@
 #include "TaskMonitoring.hpp"
 
+#include <stdio.h>
+
+#include <atomic>
+
+#include "AppMode.hpp"
 #include "PacketReceiver.hpp"
 #include "Sht40ad1b.hpp"
 #include "cli.hpp"
+#include "oled_SSD1306.hpp"
 #include "pch.hpp"
+#include "portmacro.h"
+#include "projdefs.h"
 #include "stts2h.hpp"
 
 extern Sht40ad1b            temp_sensor;
@@ -19,6 +27,10 @@ void                        ledTask(void* params) {
     while (1) {
         g.gpio_led.Toggle();
         reportAlive(MonitoredTask::Led);
+
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "AppMode: %s", namingTable[static_cast<uint8_t>(g_AppMode.load(std::memory_order_relaxed))].name);
+        g.disp.Show(buffer, 0, 0, 0);
         vTaskDelayUntil(&xLastWakeTime, xPeriod);  // replaces g.timer.start(100)
     }
 }
@@ -46,7 +58,8 @@ void sht40_Task(void* params) {
 
         xSemaphoreGive(mutex);
         reportAlive(MonitoredTask::Sht40);
-        const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
+        std::string_view str     = "SHT40: Temp:{}, Rh:{}";
+        const AppMode    curMode = g_AppMode.load(std::memory_order_relaxed);
         switch (curMode) {
             case AppMode::SendPacket: {
                 PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
@@ -55,12 +68,12 @@ void sht40_Task(void* params) {
             }
             case AppMode::Console:
                 if (stts_temp.getState() == Stts2h::SensorState::IDLE) {
-                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                    LOG_PRINT(str, temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                 }
                 break;
             case AppMode::CliMode:
                 if (cmd.getState() == CliState::Completed) {
-                    LOG_PRINT("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                    LOG_PRINT(str, temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                     cmd.setState(CliState::WaitingForInput);
                 }
                 break;
@@ -68,6 +81,13 @@ void sht40_Task(void* params) {
                 break;
         }
 
+        char               buffer[64];
+        FloatIntExtraction temp_f = convertInt(temp_sensor.getValue().temperature);
+        FloatIntExtraction Rh_f   = convertInt(temp_sensor.getValue().humidity);
+        snprintf(buffer, sizeof(buffer), "Temp:%02d.%02d", temp_f.Integer, temp_f.Decimal);
+        g.disp.Show(buffer, 0, 8, 1);
+        snprintf(buffer, sizeof(buffer), "Rh:%02d.%02d", Rh_f.Integer, Rh_f.Decimal);
+        g.disp.Show(buffer, 0, 16, 2);
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(300));
     }
 }
