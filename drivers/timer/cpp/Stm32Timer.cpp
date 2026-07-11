@@ -1,10 +1,15 @@
 #include "Stm32Timer.hpp"
 
+#include <cstdint>
+
+#include "drivers.hpp"
 #include "pch.hpp"
 
 void Stm32Timer::start(uint32_t time_ms) {
-    m_pTim->ARR = time_ms - 1;
-    m_pTim->PSC = 15999;
+    uint32_t pclk = 2 * getDrivers().sysclock.getSysClock().apb1;
+
+    m_pTim->ARR   = time_ms - 1U;
+    m_pTim->PSC   = pclk / 1000U - 1U;
 
     reset();
     clearInterruptFlag();
