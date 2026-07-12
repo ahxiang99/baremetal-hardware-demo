@@ -60,6 +60,9 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306/oled_SSD1306.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/startup_stm32f401xx.S
 )
 
 # Include directories for all compilers
@@ -75,6 +78,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
