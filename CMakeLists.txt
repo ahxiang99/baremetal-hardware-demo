@@ -78,6 +78,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
