@@ -1,9 +1,11 @@
 #pragma once
 
+#include "SSD1306/oled_SSD1306.hpp"
 #include "cpp/DmaI2C.hpp"
 #include "cpp/DmaUart.hpp"
 #include "cpp/ExtiInput.hpp"
 #include "cpp/Gpio.hpp"
+#include "cpp/Stm32Spi.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
 
@@ -14,6 +16,8 @@ struct Drivers {
     DmaUart      uart2;
     Stm32Timer   timer;
     DmaI2C       i2c1;
+    Stm32Spi     spi1;
+    OLED_Display disp;
 };
 
 Drivers& getDrivers();
