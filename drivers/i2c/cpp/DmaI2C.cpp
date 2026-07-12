@@ -151,11 +151,9 @@ bool DmaI2C::MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint
         error_ = I2C_Error::ERR_I2C_DATA_EMPTY;
         return false;
     }
-    DevAddr  = static_cast<uint8_t>(DevAddress);
-    MemAddr_ = MemAddr;
-    for (size_t i = 0; i < Size; i++) {
-        TxBuffer.push(pData[i]);
-    }
+    DevAddr    = static_cast<uint8_t>(DevAddress);
+    MemAddr_   = MemAddr;
+    XferPtr    = pData;
     XferSize   = Size;
     XferLength = XferSize;
     mode_      = I2C_Mode::MEM_WRITE;
@@ -180,9 +178,8 @@ bool DmaI2C::MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint1
         return false;
     }
 
-    DevAddr  = static_cast<uint8_t>(DevAddress);
-    MemAddr_ = MemAddr;
-    TxBuffer.push(MemAddr);
+    DevAddr    = static_cast<uint8_t>(DevAddress);
+    MemAddr_   = MemAddr;
     XferPtr    = pData;
     XferSize   = Size;
     XferLength = XferSize;
@@ -382,9 +379,8 @@ void DmaI2C::handleMemEventInterrupt(const uint32_t& sr1, const uint32_t& sr2, c
                         state_.store(I2C_State::READY, std::memory_order_relaxed);
                         mode_ = I2C_Mode::NONE;
                     } else {
-                        uint8_t byte{0};
-                        TxBuffer.pop(byte);
-                        i2c_->DR = byte;
+                        i2c_->DR = *XferPtr;
+                        XferPtr++;
                         XferSize--;
                     }
                 }
