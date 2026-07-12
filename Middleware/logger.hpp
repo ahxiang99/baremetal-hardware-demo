@@ -122,6 +122,12 @@ class Logger {
         print_transport(buf);
     }
 
+    static void print_arguments(const int32_t& val) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%02d", val);
+        print_transport(buf);
+    }
+
     static void print_arguments(const Hex& val) {
         char buf[16];
         snprintf(buf, sizeof(buf), "0x%08X", (unsigned int)val.value);
