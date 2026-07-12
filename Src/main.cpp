@@ -1,5 +1,8 @@
 #include <atomic>
+#include <cstdio>
 
+#include "FloatIntExtraction.hpp"
+#include "MAX30102.hpp"
 #include "Middleware/cli.hpp"
 #include "Middleware/logger.hpp"
 #include "RingBuffer.hpp"
@@ -19,21 +22,49 @@
 #include "pch.hpp"
 #include "stts2h.hpp"
 
-constexpr bool            kCliEnable    = false;
-constexpr bool            kSensorEnable = true;
-constexpr bool            kSendPacket   = !kCliEnable;
+constexpr bool            kCliEnable      = false;
+constexpr bool            kSensorEnable   = true;
+constexpr bool            kSendPacket     = false;
+constexpr bool            kOxiMeterEnable = false;
 
-static volatile uint32_t& CPACR         = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
+static volatile uint32_t& CPACR           = *reinterpret_cast<volatile uint32_t*>(0xE000ED88);
 
 // Global Variables
 Sht40ad1b        temp_sensor(I2C_Ref::from(getDrivers().i2c1), "SHT40");
 Stts2h           stts_temp(I2C_Ref::from(getDrivers().i2c1));
+Max30102         oxiSensor(I2C_Ref::from(getDrivers().i2c1));
 Cli              cmd;
 std::atomic_bool g_cmd_complete{true};
 
 /* Function Prototype */
 void Init_Driver(Drivers& g);
 void RegisterCallback();
+
+void i2c_address_scan() {
+    constexpr I2C_Config i2c_config{
+        .DevNum          = I2C_DeviceNum::I2C_D1,
+        .ClockFreq       = I2C_FreqHz::_100KHz,
+        .OwnAddress1     = 0,
+        .AddressingMode  = I2C_Addressing_Mode::AddressMode_7Bit,
+        .DualAddressMode = 0,
+        .OwnAddress2     = 0,
+    };
+    Stm32I2C i2c;
+    i2c.configure(i2c_config);
+    i2c.initialize();
+
+    for (size_t i = 0x00; i <= 0x7F; i++) {
+        const uint8_t data = 0;
+        if (i2c.Write(i << 1, &data, 1, 3)) {
+            LOG_INFO("Address: {} is valid", (Hex)i);
+            break;
+        } else {
+            LOG_INFO("Address: {} is not valid", (Hex)i);
+            RegisterUtils::clearBits(I2C1->SR1, 1 << 10);
+            RegisterUtils::setBits(I2C1->CR1, 1 << 9);
+        }
+    }
+}
 
 /* Main Program Start Here */
 int main() {
@@ -46,10 +77,23 @@ int main() {
         g.timer.start(500);
     }
 
-    uint32_t measure_start = g.my_systick.get_ticks();
     stts_temp.initialize();
 
+    if constexpr (kOxiMeterEnable) {
+        Max30102::SensorConfig oxi_config{Max30102::FifoSampleAvg::AVG4,      Max30102::FifoRollOver::ENABLE,      0, Max30102::SensorMode::SpO2, Max30102::SpO2ADC::SCALE_4096,
+                                          Max30102::SpO2SampleRate::RATE_100, Max30102::SpO2PulseWidth::ADC_18BITS};
+        oxiSensor.setConfig(oxi_config);
+
+        if (!oxiSensor.getInit()) {
+            oxiSensor.init();
+            LOG_INFO("Part ID: {}", (uint16_t)oxiSensor.getPartID());
+        }
+    }
+
+    uint32_t measure_start = g.my_systick.get_ticks();
     while (1) {
+        g.i2c1.processRx();
+
         /* Timer to keep firing read command when it is elapsed.*/
         if (g.timer.isElapsed()) {
             g.gpio_led.Toggle();
@@ -59,16 +103,38 @@ int main() {
                 cmd_queue.push({[](void* ctx) { static_cast<Stts2h*>(ctx)->read(); }, &stts_temp});
             }
         }
-
         /* To process i2c and Sensor Data*/
         if constexpr (kSensorEnable) {
             g.i2c1.processRx();
             temp_sensor.ProcessData();
             stts_temp.processData();
 
+            /* Start Oximeter */
+            if constexpr (kOxiMeterEnable) {
+                oxiSensor.processData();
+                cmd_queue.push({[](void* ctx) { static_cast<Max30102*>(ctx)->read(); }, &oxiSensor});
+                char buf[128];
+                if (oxiSensor.isDataReady()) {
+                    FloatIntExtraction SpO2_v = convertInt(oxiSensor.getData().spo2);
+                    snprintf(buf, sizeof(buf), "BPM and SpO2 Found.");
+                    g.disp.Show(buf, 0, 0, 0);
+                    snprintf(buf, sizeof(buf), "BPM: %d, SpO2: %d.%d", oxiSensor.getData().bpm, SpO2_v.Integer, SpO2_v.Decimal);
+                    g.disp.Show(buf, 0, 8, 1);
+                    oxiSensor.clearDataReadyFlag();
+                }
+
+                if (!oxiSensor.isFingerPresent()) {
+                    snprintf(buf, sizeof(buf), "Finger not Found.");
+                    g.disp.Show(buf, 0, 0, 0);
+                    g.disp.ClearPage(1);
+                    g.disp.FlushPage(1);
+                }
+            }
+            /* End Oximeter */
+
             /* Send data packet to PC via Uart2 */
             if constexpr (!kCliEnable) {
-                if (g.my_systick.get_ticks() - measure_start > 300) {
+                if (g.my_systick.get_ticks() - measure_start > 150) {
                     if constexpr (kSendPacket) {
                         PacketV2<Sht40ad1b::SensorData, PacketType::VERSION_1> sht40_data{temp_sensor.getValue()};
                         g.uart2.send(sht40_data.raw(), sht40_data.size());
@@ -76,8 +142,18 @@ int main() {
                         g.uart2.send(stts2h_data.raw(), stts2h_data.size());
 
                     } else {
-                        LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
+                        LOG_INFO("SHT40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
                         LOG_INFO("STTS2H: Temp:{}", stts_temp.getTemp());
+                        char               buf[128];
+                        FloatIntExtraction temp = convertInt(temp_sensor.getValue().temperature);
+                        snprintf(buf, sizeof(buf), "SHT40: Temp:%02d.%02d", temp.Integer, temp.Decimal);
+                        g.disp.Show(buf, 0, 0, 0);
+                        temp = convertInt(temp_sensor.getValue().humidity);
+                        snprintf(buf, sizeof(buf), "SHT40: Rh:%02d.%02d", temp.Integer, temp.Decimal);
+                        g.disp.Show(buf, 0, 8, 1);
+                        temp = convertInt(stts_temp.getTemp());
+                        snprintf(buf, sizeof(buf), "STTS2H: Temp:%02d.%02d", temp.Integer, temp.Decimal);
+                        g.disp.Show(buf, 0, 16, 2);
                     }
                     measure_start = g.my_systick.get_ticks();
                 }
@@ -124,6 +200,7 @@ void RegisterCallback() {
         getDrivers().i2c1.addReceiver(temp_sensor);
         getDrivers().i2c1.addReceiver(stts_temp);
         getDrivers().i2c1.addReceiver(cmd);
+        getDrivers().i2c1.addReceiver(oxiSensor);
     }
 }
 
@@ -194,7 +271,7 @@ void Init_Driver(Drivers& g) {
                                          .afr   = GPIO_AFR::GPIO_AF7_USART1_2};
 
     constexpr UartConfig  uart2_cfg{
-         .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
+        .dev_num = UartNum::USART_D2, .baudRate = UartBaudRate::_9600, .comm = kCliEnable ? UartComm::RX_TX : UartComm::TX_ONLY, .parity = UartParity::NONE, .stopbits = UartStopBit::USART_CR2_STOP_1};
 
     /* This DMA Config is for USART2 Tx */
     const DMA_Config hdmatx_cfg{.Peripheral      = DMA_Peripheral::USART2_TX,
@@ -222,13 +299,21 @@ void Init_Driver(Drivers& g) {
                                            .afr   = GPIO_AFR::GPIO_AF4_I2C1_3
 
     };
+    /* Configure spi1 Pin */
+    constexpr GPIO_Config spi1_gpio_config{.pin   = GPIO_PIN_3 | GPIO_PIN_5,
+                                           .port  = GPIO_Port::GPIO_PB,
+                                           .mode  = GPIO_Moder::GPIO_MODE_ALTFN,
+                                           .otype = GPIO_OType::GPIO_OTYPER_PP,
+                                           .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+                                           .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
+                                           .afr   = GPIO_AFR::GPIO_AF5_SPI};
 
     /* Logger Init */
     Logger::Init(UartRef::from(g.uart2));
     Logger::set_level(LogLevel::INFO);
 
     Stm32GpioPin temp;
-    Startup(temp, uart2_gpio_cfg, i2c1_gpio_config);
+    Startup(temp, uart2_gpio_cfg, i2c1_gpio_config, spi1_gpio_config);
 
     /* Configure Uart */
     g.uart2.configure(uart2_cfg, hdmatx_cfg, hdmarx_cfg);
@@ -282,6 +367,19 @@ void Init_Driver(Drivers& g) {
     /* GPIO C Pin 13 */
     g.gpio_button.configure(gpio_button_cfg);
     g.gpio_button.initialize();
+
+    /* SPI */
+    Stm32Spi::Config spi_cfg{.dev               = Stm32Spi::SpiDev::SPI_D1,
+                             .mode              = Stm32Spi::Mode::Master,
+                             .cpol              = Stm32Spi::ClockPolarity::IdleLow,
+                             .cpha              = Stm32Spi::ClockPhase::FirstEdge,
+                             .dataSize          = Stm32Spi::DataSize::Bits8,
+                             .bitOrder          = Stm32Spi::BitOrder::MsbFirst,
+                             .baudRatePrescalar = 5,
+                             .nssSoftware       = true};
+    g.spi1.initialize(spi_cfg);
+
+    g.disp.Initialize(g.spi1);
 
     LOG_INFO("Initialized Done...");
 }
