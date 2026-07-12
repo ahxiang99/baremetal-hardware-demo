@@ -17,8 +17,8 @@ class Stts2h {
 
     void initialize() {
         /* Enable BDU - Block Data Update */
-        uint8_t MASK = 1 << 6 | 1 << 3 | 1 << 7;
-        hi2c.MemWrite(devAddr, 0x04U, &MASK, 1, 3);
+        config = 1 << 6 | 1 << 3 | 1 << 7;
+        hi2c.MemWrite(devAddr, 0x04U, &config, sizeof(config), 3);
         /* Enable Automatic Address Increment */
 
         /* Put the component in Standby Mode */
@@ -93,4 +93,5 @@ class Stts2h {
     std::atomic<SensorState> m_State{SensorState::IDLE};
     bool                     whoami_called{false};
     uint32_t                 last_call{0};
+    uint8_t                  config;
 };
