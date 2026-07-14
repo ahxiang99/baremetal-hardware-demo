@@ -5,22 +5,11 @@
 #include "cpp/DmaUart.hpp"
 #include "cpp/ExtiInput.hpp"
 #include "cpp/Gpio.hpp"
+#include "cpp/Stm32Rcc.hpp"
 #include "cpp/Stm32Spi.hpp"
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/systick.hpp"
-
-struct Drivers {
-    MySysTick    my_systick;
-    Stm32GpioPin gpio_led;
-    ExtiInput    gpio_button;
-    DmaUart      uart2;
-    Stm32Timer   timer;
-    DmaI2C       i2c1;
-    Stm32Spi     spi1;
-    OLED_Display disp;
-};
-
-Drivers& getDrivers();
+#include "rtc/cpp/Stm32RTC.hpp"
 
 template <typename T>
 struct peripherals_regs_table {
@@ -28,3 +17,18 @@ struct peripherals_regs_table {
     uint32_t enableBit;
     uint32_t resetBit;
 };
+
+struct Drivers {
+    Stm32GpioPin gpio_led;
+    DmaUart      uart2;
+    DmaI2C       i2c1;
+    Stm32Spi     spi1;
+    MySysTick    my_systick;
+    Stm32Rtc     rtc;
+    Stm32Timer   timer;
+    SysClock     sysclock;
+    ExtiInput    gpio_button;
+    OLED_Display disp;
+};
+
+Drivers& getDrivers();
