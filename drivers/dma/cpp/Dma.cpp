@@ -76,8 +76,8 @@ void IDma::handleInterrupt() {
 
 void IDma::setConfig(const DMA_Config& config) {
     Config   = config;
-    Parent   = (config.Device == DMA_Device::DMA_D1) ? DMA1 : DMA2;
-    Instance = &Parent->SMx[static_cast<uint8_t>(Config.Stream)];
+    Parent   = config.DMA_BaseAddress;
+    Instance = &config.DMA_BaseAddress->SMx[static_cast<uint8_t>(Config.Stream)];
 }
 
 void IDma::clearFlag() {

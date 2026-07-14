@@ -190,10 +190,10 @@ void     LCD_DrawBitmapFullscreen(const uint8_t* pBMP);
 class ControlPin {
    public:
     ControlPin(const Stm32GpioPin& pin) : pin_(pin) {
-        pin_.Write(GPIO_State::LOW);
+        pin_.write(GPIO_State::LOW);
     }
     ~ControlPin() {
-        pin_.Write(GPIO_State::HIGH);
+        pin_.write(GPIO_State::HIGH);
     }
 
    private:
@@ -215,24 +215,27 @@ class OLED_Display {
 
     OLED_Display();
 
-    void Initialize(const Stm32Spi& spi_);
-    void Contrast(uint8_t contrast);
-    void SetAllPixelsOn(uint8_t eon_state);
-    void SetInvert(uint8_t inv_state);
-    void SetDisplayState(uint8_t disp_state);
-    void SetXDir(uint8_t x_map);
-    void SetYDir(uint8_t y_map);
-    void Orientation(OrientMode orientation);
+    Result<> Initialize(const Stm32Spi& spi_);
+    void     Contrast(uint8_t contrast);
+    void     SetAllPixelsOn(uint8_t eon_state);
+    void     SetInvert(uint8_t inv_state);
+    void     SetDisplayState(uint8_t disp_state);
+    void     SetXDir(uint8_t x_map);
+    void     SetYDir(uint8_t y_map);
+    void     Orientation(OrientMode orientation);
 
-    void Flush(void);
-    void FlushPage(uint8_t page);
+    void     Flush(void);
+    void     FlushPage(uint8_t page);
 
-    void Fill(uint8_t pattern);
-    void ClearPage(uint8_t page);
+    void     Fill(uint8_t pattern);
+    void     ClearPage(uint8_t page);
 
-    void DrawBitmapFullscreen(const uint8_t* pBMP);
+    /* Control */
+    void DisplayOn();
+    void DisplayOff();
 
     /* Draw Function */
+    void DrawBitmapFullscreen(const uint8_t* pBMP);
     void SetCursor(uint8_t x, uint8_t y);
     void DrawPixel(uint8_t x, uint8_t y, FontColor color);
     char WriteChar(char ch, Font_TypeDef Font, FontColor color);
