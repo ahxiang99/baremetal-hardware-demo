@@ -3,6 +3,7 @@
 /* C++ Standard Libraries (heavy to parse in embedded) */
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <concepts>
 #include <cstddef>
@@ -16,18 +17,26 @@
 #include <string_view>
 
 /* Define ConstantExpr */
-const size_t   CHUNK_SIZE  = 64;
-const size_t   BUFF_SIZE   = 128;
-const uint32_t HSI_Freq_Hz = 16000000;
+const size_t   CHUNK_SIZE      = 64;
+const size_t   BUFF_SIZE       = 128;
+const uint32_t HSI_Freq_Hz     = 16000000;
+
+constexpr bool kCliEnable      = false;
+constexpr bool kSensorEnable   = true;
+constexpr bool kSendPacket     = false;
+constexpr bool kOxiMeterEnable = false;
 
 /* Custom C++ Library */
 #include "FloatIntExtraction.hpp"
-#include "Middleware/logger.hpp"
 #include "RegisterUtils.hpp"
 #include "Result.hpp"
 #include "drivers.hpp"
+#include "logger.hpp"
 
 /* Custom C Library */
 #include "bit_utils.h"
 #include "cmsis.h"
 #include "low-level/nvic.h"
+#include "low-level/pwr_bitfields.h"
+#include "low-level/pwr_registers.h"
+#include "low-level/rtc_registers.h"

@@ -11,7 +11,6 @@ extern "C" {
 #include "rcc_bitfields.h"
 #include "rcc_registers.h"
 
-void Init48MHzForUSB(void);
 #ifdef __cplusplus
 }
 #endif
