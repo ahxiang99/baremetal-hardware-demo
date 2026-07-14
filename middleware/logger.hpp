@@ -10,7 +10,6 @@
 #include <string_view>
 #include <utility>
 
-#include "../Middleware/RingBuffer.hpp"
 #include "FloatIntExtraction.hpp"
 #include "RingBuffer.hpp"
 #include "cpp/DmaUart.hpp"

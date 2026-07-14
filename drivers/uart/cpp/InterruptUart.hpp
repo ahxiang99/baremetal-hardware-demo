@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Middleware/RingBuffer.hpp"
+#include "RingBuffer.hpp"
 #include "Result.hpp"
 #include "Stm32Uart.hpp"
 #include "low-level/uart_registers.h"

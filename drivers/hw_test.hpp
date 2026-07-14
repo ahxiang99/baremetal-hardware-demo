@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "DMA/cpp/Dma.hpp"
+#include "dma/cpp/Dma.hpp"
 #include "Register.hpp"
 #include "Sht40ad1b.hpp"
 #include "cpp/Dma.hpp"
