@@ -47,6 +47,7 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/init.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
@@ -61,6 +62,8 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306/oled_SSD1306.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/startup_stm32f401xx.S
 )
@@ -80,6 +83,8 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/pwr
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
