@@ -7,6 +7,7 @@
 class MySysTick {
    private:
     std::atomic<uint32_t> tickCount;
+    SysTick_TypeDef*      Instance;
 
    public:
     MySysTick();

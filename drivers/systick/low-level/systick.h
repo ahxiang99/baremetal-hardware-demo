@@ -18,6 +18,6 @@ typedef struct {
     __IOM uint32_t CALIB; /*!< SysTick Calibration Value Register,  Address offset: 0x0C */
 } SysTick_TypeDef;
 
-#define SysTick ((SysTick_TypeDef*)SYSTICK_BASE)
+#define SysTickPtr ((SysTick_TypeDef*)SYSTICK_BASE)
 
 #endif /* SYSTICK_H */
