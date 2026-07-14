@@ -6,11 +6,10 @@
 
 #include "RingBuffer.hpp"
 #include "SensorRef.hpp"
+#include "cpp/Dma.hpp"
 #include "cpp/Stm32I2C.hpp"
 #include "drivers.hpp"
-#include "pch.hpp"
 
-class IDma;
 
 struct XferParams {
     uint32_t DevAddr;
@@ -41,17 +40,17 @@ enum class I2C_IsrTag : uint8_t {
 
 class DmaI2C : public Stm32I2C {
    public:
-    bool initialize();
-    bool Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    bool MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
-    void handleEVInterrupt();
-    void handleERInterrupt();
-    void handleTxDmaInterrupt();
-    void handleRxDmaInterrupt();
-    void onDataReceived();
-    void processRx();
+    Result<> initialize();
+    bool     Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool     Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool     MemRead(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    bool     MemWrite(uint16_t DevAddress, uint8_t MemAddr, uint8_t* pData, uint16_t Size, uint32_t Timeout);
+    void     handleEVInterrupt();
+    void     handleERInterrupt();
+    void     handleTxDmaInterrupt();
+    void     handleRxDmaInterrupt();
+    void     onDataReceived();
+    void     processRx();
 
     template <Sensor T>
     void addReceiver(T& obj) {

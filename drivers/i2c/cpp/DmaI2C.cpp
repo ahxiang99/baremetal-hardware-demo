@@ -14,12 +14,12 @@
 #include "low-level/rcc_bitfields.h"
 #include "pch.hpp"
 
-bool DmaI2C::initialize() {
+Result<> DmaI2C::initialize() {
     if (!Stm32I2C::initialize()) {
-        return false;
+        return Fail(Err::HwFault);
     }
     onPostI2CInit();
-    return true;
+    return Ok();
 }
 
 void DmaI2C::onPostI2CInit() {
@@ -29,11 +29,11 @@ void DmaI2C::onPostI2CInit() {
 
 void DmaI2C::initTxDma() {
     DMA_Config config;
-    config.DMA_BaseAddress = DMA1;
-    config.Channel         = DMA_Channel::Channel_1;
-    config.Stream          = DMA_Stream::Stream_7;
-    config.Direction       = DMA_Direction::DMA_MEMORY_TO_PERIPH;
-    config.Mode            = DMA_Mode::Normal;
+    config.Device    = DMA_Device::DMA_D1;
+    config.Channel   = DMA_Channel::Channel_1;
+    config.Stream    = DMA_Stream::Stream_7;
+    config.Direction = DMA_Direction::DMA_MEMORY_TO_PERIPH;
+    config.Mode      = DMA_Mode::Normal;
 
     hdmatx.setConfig(config);
     hdmatx.initialize();
@@ -49,11 +49,11 @@ void DmaI2C::initTxDma() {
 }
 void DmaI2C::initRxDma() {
     DMA_Config config;
-    config.DMA_BaseAddress = DMA1;
-    config.Channel         = DMA_Channel::Channel_1;
-    config.Stream          = DMA_Stream::Stream_0;
-    config.Direction       = DMA_Direction::DMA_PERIPH_TO_MEMORY;
-    config.Mode            = DMA_Mode::Normal;
+    config.Device    = DMA_Device::DMA_D1;
+    config.Channel   = DMA_Channel::Channel_1;
+    config.Stream    = DMA_Stream::Stream_0;
+    config.Direction = DMA_Direction::DMA_PERIPH_TO_MEMORY;
+    config.Mode      = DMA_Mode::Normal;
 
     hdmarx.setConfig(config);
     hdmarx.initialize();
