@@ -27,7 +27,7 @@ struct Drivers {
     Stm32Rtc     rtc;
     Stm32Timer   timer;
     SysClock     sysclock;
-    ExtiInput    gpio_button;
+    ExtiInput    user_button;
     OLED_Display disp;
 };
 
