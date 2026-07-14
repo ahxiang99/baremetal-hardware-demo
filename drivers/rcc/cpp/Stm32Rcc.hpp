@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Register.hpp"
+#include "low-level/flash_bitfields.h"
+#include "low-level/flash_registers.h"
+#include "low-level/rcc_registers.h"
 
 struct PllConfig {
     uint32_t hsi_hz;  // input clock — 16,000,000
@@ -57,7 +60,104 @@ static_assert(clocks.apb2 <= 84'000'000, "APB2 overclock!");
 constexpr PllConfig cfg_bad = {16'000'000, 1, 84, 2};
 static_assert(!isValidPllConfig(cfg_bad), "bad config should be rejected");
 
-class RCC_Regs {
-    static constexpr uint32_t AHB_Addr = PERIPH_BASE + 0x00020000U;
-    using AHB_Control                  = Register<AHB_Addr, uint32_t>;
+enum class SysClockSource : uint8_t { HSI, HSE, PLL, COUNT };
+
+enum class AHB_ClockDivision : uint8_t { DIV_1, DIV_2 = (1 << 3), DIV_4, DIV_8, DIV_16, DIV_64, DIV_128, DIV_256, DIV_512 };
+
+enum class APB_ClockDivision : uint8_t { DIV_1, DIV_2 = (1 << 2), DIV_4, DIV_8, DIV_16 };
+
+struct SysClockConfig {
+    SysClockSource    Src{SysClockSource::HSI};
+    PllConfig         PllCfg;
+    AHB_ClockDivision ahb_div;
+    APB_ClockDivision apb1_div;
+    APB_ClockDivision apb2_div;
+    uint32_t          flashLatency;
+};
+
+constexpr ClockTree calcClockTree_v2(const SysClockConfig& config) {
+    uint16_t ahb_div  = 0;
+    uint16_t apb1_div = 0;
+    uint16_t apb2_div = 0;
+    switch (config.ahb_div) {
+        case AHB_ClockDivision::DIV_1:
+            ahb_div = 1;
+            break;
+        case AHB_ClockDivision::DIV_2:
+            ahb_div = 2;
+            break;
+        case AHB_ClockDivision::DIV_4:
+            ahb_div = 4;
+            break;
+        case AHB_ClockDivision::DIV_8:
+            ahb_div = 8;
+            break;
+        case AHB_ClockDivision::DIV_16:
+            ahb_div = 16;
+            break;
+        case AHB_ClockDivision::DIV_64:
+            ahb_div = 64;
+            break;
+        case AHB_ClockDivision::DIV_128:
+            ahb_div = 128;
+            break;
+        case AHB_ClockDivision::DIV_256:
+            ahb_div = 256;
+            break;
+        case AHB_ClockDivision::DIV_512:
+            ahb_div = 512;
+            break;
+    }
+
+    switch (config.apb1_div) {
+        case APB_ClockDivision::DIV_1:
+            apb1_div = 1;
+            break;
+        case APB_ClockDivision::DIV_2:
+            apb1_div = 2;
+            break;
+        case APB_ClockDivision::DIV_4:
+            apb1_div = 4;
+            break;
+        case APB_ClockDivision::DIV_8:
+            apb1_div = 8;
+            break;
+        case APB_ClockDivision::DIV_16:
+            apb1_div = 16;
+            break;
+    }
+
+    switch (config.apb2_div) {
+        case APB_ClockDivision::DIV_1:
+            apb2_div = 1;
+            break;
+        case APB_ClockDivision::DIV_2:
+            apb2_div = 2;
+            break;
+        case APB_ClockDivision::DIV_4:
+            apb2_div = 4;
+            break;
+        case APB_ClockDivision::DIV_8:
+            apb2_div = 8;
+            break;
+        case APB_ClockDivision::DIV_16:
+            apb2_div = 16;
+            break;
+    }
+
+    return calcClockTree(config.PllCfg, ahb_div, apb1_div, apb2_div);
+}
+
+class SysClock {
+   public:
+    SysClock();
+    void      initialize(const SysClockConfig& config, const ClockTree& clock);
+    void      configurePrescaler();
+    ClockTree getSysClock();
+
+   private:
+    RCC_TypeDef*   m_Instance;
+    Flash_TypeDef* m_Flash;
+    SysClockConfig m_Config;
+    ClockTree      m_SysClock;
 };

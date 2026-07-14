@@ -1,6 +1,18 @@
 #ifndef RCC_BITFIELDS_H
 #define RCC_BITFIELDS_H
 
+#define RCC_CFGR_SW_Pos (0)
+#define RCC_CFGR_SW_Msk (3U << RCC_CFGR_SW_Pos)
+#define RCC_CFGR_SWS_Pos (2)
+#define RCC_CFGR_SWS_Msk (3U << RCC_CFGR_SWS_Pos)
+
+#define RCC_CFGR_HPRE_Pos (4)
+#define RCC_CFGR_HPRE_Msk (0xFU << RCC_CFGR_HPRE_Pos)
+#define RCC_CFGR_PPRE1_Pos (10)
+#define RCC_CFGR_PPRE1_Msk (0x7U << RCC_CFGR_PPRE1_Pos)
+#define RCC_CFGR_PPRE2_Pos (13)
+#define RCC_CFGR_PPRE2_Msk (0x7U << RCC_CFGR_PPRE2_Pos)
+
 #define RCC_AHB1RSTR_GPIOA_RST (1 << 0)
 #define RCC_AHB1RSTR_GPIOB_RST (1 << 1)
 #define RCC_AHB1RSTR_GPIOC_RST (1 << 2)
@@ -86,9 +98,14 @@
 #define RCC_CR_PLLI2SON (1 << 24)
 #define RCC_CR_PLLI2SRDY (1 << 24)
 
-#define RCC_CFGR_PLLM_Pos (0)
-#define RCC_CFGR_PLLN_Pos (6)
-#define RCC_CFGR_PLLP_Pos (16)
-#define RCC_CFGR_PLLQ_Pos (24)
+#define RCC_PLLCFGR_PLLM_Pos (0)
+#define RCC_PLLCFGR_PLLN_Pos (6)
+#define RCC_PLLCFGR_PLLP_Pos (16)
+#define RCC_PLLCFGR_PLLQ_Pos (24)
+#define RCC_PLLCFGR_PLLSRC_Pos (22)
+
+#define RCC_PLLCFGR_PLLM_Msk (0x3FU << RCC_PLLCFGR_PLLM_Pos)
+#define RCC_PLLCFGR_PLLN_Msk (0x1FFU << RCC_PLLCFGR_PLLN_Pos)
+#define RCC_PLLCFGR_PLLP_Msk (0x3U << RCC_PLLCFGR_PLLP_Pos)
 
 #endif
