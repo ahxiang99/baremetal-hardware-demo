@@ -6,9 +6,11 @@
 #define TIM_CR1_URS (1 << 2)
 #define TIM_CR1_OPM (1 << 3)
 #define TIM_CR1_DIR (1 << 4)
-#define TIM_CR1_CMS (1 << 5)
+#define TIM_CR1_CMS_Pos (5)
+#define TIM_CR1_CMS_Msk (0x3U << TIM_CR1_CMS_Pos)
 #define TIM_CR1_ARPE (1 << 7)
-#define TIM_CR1_CKD (1 << 8)
+#define TIM_CR1_CKD_Pos (8)
+#define TIM_CR1_CKD_Msk (0x3U << TIM_CR1_CKD_Pos)
 
 #define TIM_CR2_CCDS (1 << 3)
 #define TIM_CR2_MMS (1 << 4)

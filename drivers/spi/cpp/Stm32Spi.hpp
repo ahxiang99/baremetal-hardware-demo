@@ -23,13 +23,14 @@ class Stm32Spi {
         bool          nssSoftware;
     };
 
-    void initialize(const Config& cfg);
-    void transferOnly(const uint8_t* txBuf, size_t len);
-    bool isBusy() const;
+    Result<>     initialize(const Config& cfg);
+    void         transferOnly(const uint8_t* txBuf, size_t len);
+    bool         isBusy() const;
+
+    SPI_TypeDef* rawInstance() const;
 
    private:
     enum class State { Idle, Transmitting, Receiving, Error };
     State        state_ = State::Idle;
-
     SPI_TypeDef* spi_;
 };

@@ -10,24 +10,25 @@
 #include "RingBuffer.hpp"
 #include "Stm32Uart.hpp"
 #include "cpp/Dma.hpp"
+#include "low-level/uart_registers.h"
 
 class DmaUart : public Stm32Uart {
     using RxCallbackFn = void (*)(void*, const uint8_t*, size_t);
 
    public:
     DmaUart();
-    void                        configure(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg);
-    Result<bool, UartInitError> initialize();
+    void     configure();
+    Result<> initialize(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg);
 
-    bool                        send(const uint8_t* pData, size_t Size);
-    bool                        receive(uint8_t* pData, size_t Size);
+    bool     send(const uint8_t* pData, size_t Size);
+    bool     receive(uint8_t* pData, size_t Size);
 
-    void                        onDataReceived(RxCallbackFn fn, void* ctx);
-    void                        processRx();
+    void     onDataReceived(RxCallbackFn fn, void* ctx);
+    void     processRx();
 
-    void                        handleInterrupt();
-    void                        handleTxDmaInterrupt();
-    void                        handleRxDmaInterrupt();
+    void     handleInterrupt();
+    void     handleTxDmaInterrupt();
+    void     handleRxDmaInterrupt();
 
    protected:
     // Interupt Handler
@@ -49,8 +50,11 @@ class DmaUart : public Stm32Uart {
     bool                           rxEnabled = false;
     std::atomic_bool               keyboardEventReady{false};
     volatile uint16_t              captured_ndtr_{0};
-    void                           enable_DMA_request();
-    void                           disable_DMA_request();
+    void                           enableTxDmaRequest();
+    void                           disableTxDmaRequest();
+    void                           enableRxDmaRequest();
+    void                           disableRxDmaRequest();
+
     void                           initDmaTx();
     void                           initDmaRx();
     bool                           startNextDmaTransfer();

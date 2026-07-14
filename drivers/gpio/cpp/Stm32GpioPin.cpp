@@ -3,8 +3,12 @@
 #include <cstdint>
 
 #include "RegisterUtils.hpp"
+#include "logger.hpp"
+#include "low-level/gpio_bitfields.h"
 #include "low-level/gpio_registers.h"
 #include "pch.hpp"
+
+namespace {
 
 static const peripherals_regs_table<GPIO_TypeDef> gpio_table[static_cast<uint8_t>(GPIO_Port::GPIO_PORT_COUNT)] = {
     {GPIOA, RCC_AHB1ENR_GPIOA_EN, RCC_AHB1RSTR_GPIOA_RST},
@@ -15,78 +19,75 @@ static const peripherals_regs_table<GPIO_TypeDef> gpio_table[static_cast<uint8_t
     {GPIOH, RCC_AHB1ENR_GPIOH_EN, RCC_AHB1RSTR_GPIOH_RST},
 };
 
-bool Stm32GpioPin::Init(const GPIO_Config& config) {
-    config_ = config;
-    gpio_   = gpio_table[static_cast<uint8_t>(config_.port)].instance;
-    enableGpioClock();
-    if (!configurePin()) {
-        return false;
+Result<> validate(const GPIO_Config& cfg) {
+    if (static_cast<uint8_t>(cfg.port) >= static_cast<uint8_t>(GPIO_Port::GPIO_PORT_COUNT)) {
+        return Fail(Err::InvalidPort);
     }
-    return true;
-}
-
-void Stm32GpioPin::Write(GPIO_State state) {
-    if (state != GPIO_State::LOW) {
-        gpio_->BSRR = static_cast<uint32_t>(config_.pin);
-    } else {
-        gpio_->BSRR = static_cast<uint32_t>(config_.pin) << 16U;
+    if ((cfg.pin & 0xFFFFU) == 0) {
+        return Fail(Err::InvalidPinMask);
     }
-}
-
-GPIO_State Stm32GpioPin::Read() {
-    if ((gpio_->IDR & static_cast<uint32_t>(config_.pin)) != static_cast<uint32_t>(GPIO_State::LOW)) {
-        return GPIO_State::HIGH;
-    } else {
-        return GPIO_State::LOW;
+    if (cfg.afr != GPIO_AFR::GPIO_AF0_SYSTEM && cfg.mode != GPIO_Moder::GPIO_MODE_ALTFN) {
+        return Fail(Err::AfOnNonAltFn);
     }
-}
-void Stm32GpioPin::Toggle() {
-    if ((gpio_->ODR & static_cast<uint32_t>(config_.pin))) {
-        Write(GPIO_State::LOW);
-    } else {
-        Write(GPIO_State::HIGH);
-    }
+    return Ok();
 }
 
-void Stm32GpioPin::enableGpioClock() {
-    volatile uint32_t* enrReg    = &RCC->AHB1ENR;
-    uint32_t           enableBit = gpio_table[static_cast<uint8_t>(config_.port)].enableBit;
-    RegisterUtils::setBits(*enrReg, enableBit);
+GPIO_TypeDef* enableAndGet(GPIO_Port port) {
+    const auto& entry = gpio_table[static_cast<uint8_t>(port)];
+    RegisterUtils::setBits(RCC->AHB1ENR, entry.enableBit);
+    (void)RCC->AHB1ENR;
+    return entry.instance;
 }
 
-bool Stm32GpioPin::configurePin() {
-    if (gpio_ == nullptr) return false;
-    uint32_t temp = 0;
-    for (auto i = 0; i < 16; ++i) {
-        uint32_t pin_mask   = 1 << i;
-        uint32_t currentpin = config_.pin & pin_mask;
+void applyPinConfig(GPIO_TypeDef* gpio, const GPIO_Config& cfg) {
+    for (uint32_t i = 0; i < GPIO_PIN_COUNT; ++i) {
+        if (!(cfg.pin & (1u << i))) continue;
 
-        if (currentpin == pin_mask) {
-            temp = gpio_->MODER;
-            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
-            RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.mode) << (i * 2));
-            gpio_->MODER = temp;
-
-            temp         = gpio_->OTYPER;
-            RegisterUtils::clearBits(temp, 1 << i);
-            RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.otype) << i);
-            gpio_->OTYPER = temp;
-
-            temp          = gpio_->OSPEEDR;
-            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
-            RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.ospdr) << (i * 2));
-            gpio_->OSPEEDR = temp;
-
-            temp           = gpio_->PUPDR;
-            RegisterUtils::clearBits(temp, (3 << 0) << (i * 2));
-            RegisterUtils::setBits(temp, static_cast<uint32_t>(config_.pupdr) << (i * 2));
-            gpio_->PUPDR = temp;
-
-            temp         = gpio_->AFR[i >> 3U];
-            temp &= ~(0xFU << (i & 0x07U) * 4U);
-            temp |= (static_cast<uint32_t>(config_.afr) << (i & 0x07U) * 4U);
-            gpio_->AFR[i >> 3U] = temp;
+        RegisterUtils::modify(gpio->MODER, (3U << (i * 2)), static_cast<uint32_t>(cfg.mode) << (i * 2));
+        RegisterUtils::modify(gpio->OTYPER, (1U << i), static_cast<uint32_t>(cfg.otype) << i);
+        RegisterUtils::modify(gpio->OSPEEDR, (3U << (i * 2)), static_cast<uint32_t>(cfg.ospdr) << (i * 2));
+        RegisterUtils::modify(gpio->PUPDR, (3U << (i * 2)), static_cast<uint32_t>(cfg.pupdr) << (i * 2));
+        if (cfg.mode == GPIO_Moder::GPIO_MODE_ALTFN) {  // guarded now
+            const uint32_t sh = (i & 7u) * 4u;
+            RegisterUtils::modify(gpio->AFR[i >> 3], 0xFu << sh, static_cast<uint32_t>(cfg.afr) << sh);
         }
     }
-    return true;
+}
+
+}  // namespace
+
+Result<> Gpio::configureMux(const GPIO_Config& cfg) {
+    TRY(validate(cfg));
+    applyPinConfig(enableAndGet(cfg.port), cfg);
+    return Ok();
+}
+
+Result<> Stm32GpioPin::initialize(const GPIO_Config& cfg) {
+    TRY(validate(cfg));
+    if (__builtin_popcount(cfg.pin & 0xFFFFU) != 1) {
+        return Fail(Err::InvalidPinMask);
+    }
+    gpio_ = enableAndGet(cfg.port);
+    if (gpio_ == nullptr) return Fail(Err::NullInstance);
+
+    pin_ = cfg.pin & 0xFFFFU;
+    applyPinConfig(gpio_, cfg);
+    LOG_DEBUG("GPIO pin {} on port {} ready", pin_, static_cast<uint32_t>(cfg.port));
+    return Ok();
+}
+
+void Stm32GpioPin::write(GPIO_State s) {
+    gpio_->BSRR = (s == GPIO_State::LOW) ? (pin_ << 16) : pin_;
+}
+
+GPIO_State Stm32GpioPin::read() const {
+    return (gpio_->IDR & pin_) ? GPIO_State::HIGH : GPIO_State::LOW;
+}
+
+void Stm32GpioPin::toggle() {
+    if ((gpio_->ODR & static_cast<uint32_t>(pin_))) {
+        write(GPIO_State::LOW);
+    } else {
+        write(GPIO_State::HIGH);
+    }
 }

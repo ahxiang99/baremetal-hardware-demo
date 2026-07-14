@@ -25,7 +25,7 @@ void                        ledTask(void* params) {
     TickType_t       xLastWakeTime = xTaskGetTickCount();
     const TickType_t xPeriod       = pdMS_TO_TICKS(100);
     while (1) {
-        g.gpio_led.Toggle();
+        g.gpio_led.toggle();
         reportAlive(MonitoredTask::Led);
 
         char buffer[32];

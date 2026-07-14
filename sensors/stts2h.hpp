@@ -44,7 +44,7 @@ class Stts2h {
                 break;
         }
 
-        hi2c.MemWrite(DEV_ADDR, CTRL_REG, &m_Mask, 1, TIMEOUT);
+        hi2c.MemWrite(DEV_ADDR, CTRL_REG, (uint8_t*)&m_Mask, 1, TIMEOUT);
     }
 
     void get_whoami() {
@@ -77,7 +77,7 @@ class Stts2h {
             /* One Shot Mode */
             if (m_State.load(std::memory_order_relaxed) == SensorState::IDLE) {
                 m_Mask |= ONESHOT_MASK;
-                if (hi2c.MemWrite(DEV_ADDR, CTRL_REG, &m_Mask, 1, TIMEOUT)) {
+                if (hi2c.MemWrite(DEV_ADDR, CTRL_REG, (uint8_t*)&m_Mask, 1, TIMEOUT)) {
                     m_State.store(SensorState::MEASURING, std::memory_order_relaxed);
                     last_call = getDrivers().my_systick.get_ticks();
                 }
@@ -151,7 +151,7 @@ class Stts2h {
     float_t                  m_Temp{0.0f};
     std::atomic<SensorState> m_State{SensorState::IDLE};
     SensorMode               m_Mode;
-    uint8_t                  m_Mask;  // For One Shot Mode
+    uint32_t                 m_Mask;  // For One Shot Mode
     bool                     whoami_called{false};
     uint32_t                 last_call{0};
 };

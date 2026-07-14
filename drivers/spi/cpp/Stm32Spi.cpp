@@ -11,9 +11,11 @@ static const peripherals_regs_table<SPI_TypeDef> spi_rcc_table[static_cast<uint8
     {SPI4, RCC_APB2ENR_SPI4_EN, RCC_APB2RSTR_SPI4_RST}
 };
 
-void Stm32Spi::initialize(const Config& cfg) {
+Result<> Stm32Spi::initialize(const Config& cfg) {
     /* assign instance */
     spi_ = spi_rcc_table[static_cast<uint8_t>(cfg.dev)].instance;
+
+    if (spi_ == nullptr) return Fail(Err::NullInstance);
 
     /* Enable Clock */
     if (spi_ == SPI1 || spi_ == SPI4) {
@@ -52,6 +54,8 @@ void Stm32Spi::initialize(const Config& cfg) {
 
     /* Enable SPI */
     RegisterUtils::setBits(spi_->CR1, SPI_CR1_SPE);
+
+    return Ok();
 }
 void Stm32Spi::transferOnly(const uint8_t* txBuf, size_t len) {
     if (len == 0) return;
@@ -72,4 +76,7 @@ void Stm32Spi::transferOnly(const uint8_t* txBuf, size_t len) {
 bool Stm32Spi::isBusy() const {
     const uint32_t sr = spi_->SR;
     return sr & SPI_SR_BSY;
+}
+SPI_TypeDef* Stm32Spi::rawInstance() const {
+    return spi_;
 }

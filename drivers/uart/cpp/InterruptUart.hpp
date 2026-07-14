@@ -1,29 +1,29 @@
 #pragma once
 
-#include "../Middleware/RingBuffer.hpp"
+#include "RingBuffer.hpp"
 #include "Result.hpp"
 #include "Stm32Uart.hpp"
-
+#include "low-level/uart_registers.h"
 
 class InterruptUart : public Stm32Uart {
    public:
     using Stm32Uart::Stm32Uart;
     using rxCallback = void (*)(const uint8_t* pData, size_t len);
 
-    Result<bool, UartInitError> initialize();
-    bool                        send(const uint8_t* data, size_t DataLength);
-    bool                        receive(uint8_t* data, size_t DataLength);
+    Result<> initialize(const UartConfig& cfg);
+    bool     send(const uint8_t* data, size_t DataLength);
+    bool     receive(uint8_t* data, size_t DataLength);
 
-    void                        handleInterrupt();
-    void                        onDataReceived(rxCallback cb);
-    void                        processRx();
+    void     handleInterrupt();
+    void     onDataReceived(rxCallback cb);
+    void     processRx();
 
    protected:
-    bool onPostUartInit();
-    void onTxInterrupt();
-    void onRxInterrupt();
+    Result<> onPostUartInit();
+    void     onTxInterrupt();
+    void     onRxInterrupt();
 
-    void recoverTx();
+    void     recoverTx();
 
    private:
     RingBuffer<uint8_t, BUFF_SIZE> TxBuffer;

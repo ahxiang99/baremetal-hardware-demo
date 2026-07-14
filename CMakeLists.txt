@@ -47,6 +47,7 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/init.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/TaskMonitoring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
@@ -61,9 +62,9 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA/cpp/Dma.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput/cpp/ExtiInput.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti/cpp/ExtiInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306/oled_SSD1306.cpp
 
 
@@ -84,12 +85,12 @@ set(sources_SRCS
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ExtiInput
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/DMA
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dma
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
@@ -98,8 +99,12 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/pwr
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware/SSD1306
     ${CMAKE_CURRENT_SOURCE_DIR}/Middleware
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensors
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/include
     ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS/FreeRTOS-Kernel/portable/GCC/ARM_CM4F
 )

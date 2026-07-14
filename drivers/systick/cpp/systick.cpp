@@ -1,11 +1,8 @@
 #include "systick.hpp"
 
-#include "FreeRTOS.h"
-#include "drivers.hpp"
 #include "pch.hpp"
-#include "task.h"
 
-MySysTick::MySysTick() : Instance(SysTick) {}
+MySysTick::MySysTick() : Instance(SysTickPtr) {}
 
 void MySysTick::init() {
     // Construct 1ms heartbeat
@@ -16,7 +13,7 @@ void MySysTick::init() {
 }
 
 MySysTick::~MySysTick() {
-    SysTick->CTRL = 0x00U;  // Disable SysTick
+    Instance->CTRL = 0x00U;  // Disable SysTick
 }
 
 uint32_t MySysTick::get_ticks() const {
@@ -32,13 +29,6 @@ void MySysTick::delay_ms(uint32_t ms) const {
     while ((tickCount.load(std::memory_order_relaxed) - _start) < ms);
 }
 
-extern "C" void                xPortSysTickHandler(void);
-
-extern "C" volatile BaseType_t xTaskSchedulerRunning;  // FreeRTOS internal flag
-
-extern "C" void                SysTick_Handler() {
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
-        xPortSysTickHandler();  // ← only call when scheduler is running
-    }
+extern "C" void SysTick_Handler() {
     getDrivers().my_systick.tick();
 }

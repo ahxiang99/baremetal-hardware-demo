@@ -108,4 +108,13 @@
 #define RCC_PLLCFGR_PLLN_Msk (0x1FFU << RCC_PLLCFGR_PLLN_Pos)
 #define RCC_PLLCFGR_PLLP_Msk (0x3U << RCC_PLLCFGR_PLLP_Pos)
 
+#define RCC_BDCR_LSEON (1 << 0)
+#define RCC_BDCR_LSERDY_Msk (1 << 1)
+#define RCC_BDCR_LSEBYP (1 << 2)
+#define RCC_BDCR_RTCSEL_Pos 8
+#define RCC_BDCR_RTCSEL_Msk (0x3U << RCC_BDCR_RTCSEL_Pos)
+#define RCC_BDCR_RTCSEL_LSE (1 << RCC_BDCR_RTCSEL_Pos)
+#define RCC_BDCR_RTCEN (1 << 15)
+#define RCC_BDCR_BDRST (1 << 16)
+
 #endif

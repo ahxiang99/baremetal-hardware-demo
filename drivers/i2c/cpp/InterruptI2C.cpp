@@ -6,217 +6,215 @@
 #include "low-level/i2c_bitfields.h"
 #include "pch.hpp"
 
-bool InterruptI2C::initialize() {
-    // 1. check uart_ not null
-    // 2. check already initialised
-    // 3. call Stm32Uart::initialize()
-    // 4. call onPostInit()
-    // return success or specific error
+Result<> InterruptI2C::initialize(const i2c_config_t &cfg) {
+  TRY(Stm32I2C::initialize(cfg));
+  enable_nvic(cfg.DevNum);
 
-    if (!Stm32I2C::initialize()) {
-        return false;
+  if (i2c_ == nullptr)
+    return Fail(Err::NullInstance);
+
+  return Ok();
+}
+
+bool InterruptI2C::Write(uint16_t DevAddress, uint8_t *pData, uint16_t Size,
+                         uint32_t Timeout) {
+  if (state_ == i2c_state_t::READY) {
+    if (isHardwareBusy(Timeout)) {
+      error_ = i2c_error_t::ERR_I2C_BUSY;
+      return false;
     }
-    onPostI2CInit();
+
+    state_ = i2c_state_t::BUSY_TX;
+    mode_ = i2c_mode_t::MASTER;
+    error_ = i2c_error_t::NONE;
+
+    DevAddr = DevAddress;
+    XferPtr = pData;
+    XferSize = Size;
+
+    generate_start();
+    enable_interrupt();
     return true;
+  } else {
+    return false;
+  }
 }
 
-void InterruptI2C::onPostI2CInit() {
-    Stm32I2C::enableNVICInterrupt();
-}
-
-bool InterruptI2C::Write(uint16_t DevAddress, const uint8_t* pData, uint16_t Size, uint32_t Timeout) {
-    if (state_ == I2C_State::READY) {
-        if (isHardwareBusy(Timeout)) {
-            error_ = I2C_Error::ERR_I2C_BUSY;
-            return false;
-        }
-
-        state_   = I2C_State::BUSY_TX;
-        mode_    = I2C_Mode::MASTER;
-        error_   = I2C_Error::NONE;
-
-        DevAddr  = DevAddress;
-        XferSize = Size;
-
-        for (size_t i = 0; i < Size; ++i) {
-            TxBuffer.push(pData[i]);
-        }
-
-        generateStartCondition();
-        enableInterruptFlag();
-        return true;
-    } else {
-        return false;
+bool InterruptI2C::Read(uint16_t DevAddress, uint8_t *pData, uint16_t Size,
+                        uint32_t Timeout) {
+  if (state_ == i2c_state_t::READY) {
+    if (isHardwareBusy(Timeout)) {
+      error_ = i2c_error_t::ERR_I2C_BUSY;
+      return false;
     }
-}
 
-bool InterruptI2C::Read(uint16_t DevAddress, uint8_t* pData, uint16_t Size, uint32_t Timeout) {
-    if (state_ == I2C_State::READY) {
-        if (isHardwareBusy(Timeout)) {
-            error_ = I2C_Error::ERR_I2C_BUSY;
-            return false;
-        }
+    state_ = i2c_state_t::BUSY_RX;
+    mode_ = i2c_mode_t::MASTER;
+    error_ = i2c_error_t::NONE;
 
-        state_   = I2C_State::BUSY_RX;
-        mode_    = I2C_Mode::MASTER;
-        error_   = I2C_Error::NONE;
+    DevAddr = DevAddress;
+    XferPtr = pData;
+    XferSize = Size;
 
-        DevAddr  = DevAddress;
-        XferPtr  = pData;
-        XferSize = Size;
+    enableAckBit();
 
-        enableAckBit();
+    generate_start();
 
-        generateStartCondition();
+    enable_interrupt();
 
-        enableInterruptFlag();
-
-        return true;
-
-    } else {
-        return false;
-    }
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void InterruptI2C::processRx() {
-    if (RxEventFlag.load(std::memory_order_acquire)) {
-        RxEventFlag.store(false, std::memory_order_relaxed);
+  if (RxEventFlag.load(std::memory_order_acquire)) {
+    RxEventFlag.store(false, std::memory_order_relaxed);
 
-        while (RxBuffer.size() > 0) {
-            *XferPtr++ = RxBuffer.pop().value();
-        }
-
-        if (dataCallback) {
-            dataCallback();
-        }
+    while (RxBuffer.size() > 0) {
+      *XferPtr++ = RxBuffer.pop().value();
     }
+    onDataReceived();
+  }
 }
 
 void InterruptI2C::handleEVInterrupt() {
-    const uint32_t sr1 = i2c_->SR1;
-    // SB Flag: Start condition generated
-    if (sr1 & I2C_SR1_SB) {
-        if (state_ == I2C_State::BUSY_TX) {
-            i2c_->DR = DevAddr & ~(1 << 0);
-        } else if (state_ == I2C_State::BUSY_RX) {
-            i2c_->DR = DevAddr | (1 << 0);
-        } else {
-            state_ = I2C_State::ERROR;
-            error_ = I2C_Error::ERR_I2C_SB;
-            Error_Handler();
+  const uint32_t sr1 = i2c_->SR1;
+  // SB Flag: Start  generated
+  if (sr1 & I2C_SR1_SB) {
+    if (state_ == i2c_state_t::BUSY_TX) {
+      i2c_->DR = DevAddr & ~(1 << 0);
+    } else if (state_ == i2c_state_t::BUSY_RX) {
+      i2c_->DR = DevAddr | (1 << 0);
+    } else {
+      state_ = i2c_state_t::ERROR;
+      error_ = i2c_error_t::ERR_I2C_SB;
+      Error_Handler();
+    }
+  }
+  // ADDR Flag: Address sent and ACK received
+  else if (sr1 & I2C_SR1_ADDR) {
+    if (state_.load(std::memory_order_relaxed) == i2c_state_t::BUSY_RX) {
+      if (XferSize == 1) {
+        disableAckBit();
+        generate_stop();
+      }
+    }
+    // Clear ADDR Bit
+    clear_addr();
+  }
+  // TXE Flag: Data register empty, ready for next byte
+  else if ((sr1 & I2C_SR1_TXE) && !(sr1 & I2C_SR1_BTF) &&
+           (state_ == i2c_state_t::BUSY_TX)) {
+    if (XferSize > 0) {
+      i2c_->DR = *XferPtr++;
+      XferSize--;
+    }
+  }
+  // Wait for BTF (Byte Transfer Finished) to ensure last byte is gone
+  else if ((sr1 & I2C_SR1_BTF)) {
+    if (state_ == i2c_state_t::BUSY_TX) {
+      // Tx State
+      if (XferSize > 0) {
+        i2c_->DR = *XferPtr++;
+        XferSize--;
+      } else {
+        // Nothing to send, Send Stop .
+        generate_stop();
+        disable_interrupt();
+        state_ = i2c_state_t::READY;
+        mode_ = i2c_mode_t::NONE;
+      }
+    }
+  }
+  // RNXE Flag: Data register is full, receive the byte
+  else if ((sr1 & I2C_SR1_RXNE)) {
+    if (state_ == i2c_state_t::BUSY_RX) {
+      if (XferSize > 1) {
+        if (XferSize == 2) {
+          disableAckBit();
+          generate_stop();
         }
+        RxBuffer.push(i2c_->DR);
+        XferSize--;
+      } else {
+        RxBuffer.push(i2c_->DR);
+        XferSize--;
+        state_ = i2c_state_t::READY;
+        mode_ = i2c_mode_t::NONE;
+        disable_interrupt();
+        RxEventFlag.store(true, std::memory_order_release);
+      }
     }
-    // ADDR Flag: Address sent and ACK received
-    else if (sr1 & I2C_SR1_ADDR) {
-        // Clear ADDR Bit
-        clearAddrFlag();
-    }
-    // TXE Flag: Data register empty, ready for next byte
-    else if ((sr1 & I2C_SR1_TXE) && !(sr1 & I2C_SR1_BTF) && (state_ == I2C_State::BUSY_TX)) {
-        if (TxBuffer.size() > 0) {
-            i2c_->DR = TxBuffer.pop().value();
-        }
-    }
-    // Wait for BTF (Byte Transfer Finished) to ensure last byte is gone
-    else if ((sr1 & I2C_SR1_BTF)) {
-        if (state_ == I2C_State::BUSY_TX) {
-            // Tx State
-            if (TxBuffer.size() > 0) {
-                i2c_->DR = TxBuffer.pop().value();
-            } else if (TxBuffer.empty()) {
-                // Nothing to send, Send Stop Condition.
-                generateStopCondition();
-                disableInterruptFlag();
-                state_ = I2C_State::READY;
-                mode_  = I2C_Mode::NONE;
-            }
-        }
-    }
-    // RNXE Flag: Data register is full, receive the byte
-    else if ((sr1 & I2C_SR1_RXNE)) {
-        if (state_ == I2C_State::BUSY_RX) {
-            if (XferSize > 1) {
-                if (XferSize == 2) {
-                    disableAckBit();
-                    generateStopCondition();
-                }
-                RxBuffer.push(i2c_->DR);
-                XferSize--;
-            } else {
-                RxBuffer.push(i2c_->DR);
-                XferSize--;
-                state_ = I2C_State::READY;
-                mode_  = I2C_Mode::NONE;
-                RxEventFlag.store(true, std::memory_order_release);
-                disableInterruptFlag();
-            }
-        }
-    }
+  }
 }
 
 void InterruptI2C::handleERInterrupt() {
-    const uint32_t sr1 = i2c_->SR1;
-    // 1. Acknowledge Failure (AF) - The Sensor didn't respond
-    if (sr1 & I2C_SR1_AF) {
-        // Clear flag: Write 0 to the bit
-        clearAFFlag();
+  const uint32_t sr1 = i2c_->SR1;
+  // 1. Acknowledge Failure (AF) - The Sensor didn't respond
+  if (sr1 & I2C_SR1_AF) {
+    // Clear flag: Write 0 to the bit
+    clear_nack();
 
-        // Action: Generate STOP to release the bus
-        generateStopCondition();
+    // Action: Generate STOP to release the bus
+    generate_stop();
 
-        state_ = I2C_State::ERROR;
-        mode_  = I2C_Mode::NONE;
-        error_ = I2C_Error::ERR_I2C_AF;
-    }
+    state_ = i2c_state_t::ERROR;
+    mode_ = i2c_mode_t::NONE;
+    error_ = i2c_error_t::ERR_I2C_AF;
+  }
 
-    // 2. Bus Error (BERR) - Misplaced Start/Stop condition
-    else if (sr1 & I2C_SR1_BERR) {
-        clearBERRFlag();
-        state_ = I2C_State::ERROR;
-        mode_  = I2C_Mode::NONE;
-        error_ = I2C_Error::ERR_I2C_BUS;
-    }
+  // 2. Bus Error (BERR) - Misplaced Start/Stop
+  else if (sr1 & I2C_SR1_BERR) {
+    clear_berr();
+    state_ = i2c_state_t::ERROR;
+    mode_ = i2c_mode_t::NONE;
+    error_ = i2c_error_t::ERR_I2C_BUS;
+  }
 
-    // 3. Arbitration Lost (ARLO) - Another Master took the bus
-    else if (sr1 & I2C_SR1_ARLO) {
-        clearARLOFLag();
-        state_ = I2C_State::ERROR;
-        mode_  = I2C_Mode::NONE;
-        error_ = I2C_Error::ERR_I2C_ARLO;
-    }
+  // 3. Arbitration Lost (ARLO) - Another Master took the bus
+  else if (sr1 & I2C_SR1_ARLO) {
+    clear_arlo();
+    state_ = i2c_state_t::ERROR;
+    mode_ = i2c_mode_t::NONE;
+    error_ = i2c_error_t::ERR_I2C_ARLO;
+  }
 
-    // 4. Overrun/Underrun (OVR) - CPU too slow for the clock speed
-    else if (sr1 & I2C_SR1_OVR) {
-        clearOVRFLag();
-        state_ = I2C_State::ERROR;
-        mode_  = I2C_Mode::NONE;
-        error_ = I2C_Error::ERR_I2C_OVR;
-    }
-    Error_Handler();
-    // CRITICAL: Disable interrupts so we don't loop forever in an error state
-    disableInterruptFlag();
+  // 4. Overrun/Underrun (OVR) - CPU too slow for the clock speed
+  else if (sr1 & I2C_SR1_OVR) {
+    clear_ovr();
+    state_ = i2c_state_t::ERROR;
+    mode_ = i2c_mode_t::NONE;
+    error_ = i2c_error_t::ERR_I2C_OVR;
+  }
+  Error_Handler();
+  // CRITICAL: Disable interrupts so we don't loop forever in an error state
+  disable_interrupt();
 }
 
-void InterruptI2C::enableInterruptFlag() {
-    constexpr uint32_t mask = I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN;
-    RegisterUtils::setBits(i2c_->CR2, mask);
+void InterruptI2C::enable_interrupt() {
+  RegisterUtils::setBits(i2c_->CR2,
+                         I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
 }
 
-void InterruptI2C::disableInterruptFlag() {
-    constexpr uint32_t mask = I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN;
-    RegisterUtils::clearBits(i2c_->CR2, mask);
+void InterruptI2C::disable_interrupt() {
+  RegisterUtils::clearBits(i2c_->CR2,
+                           I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
 }
 
-void InterruptI2C::onDataReceived(rxCallback cb) {
-    dataCallback = cb;
+void InterruptI2C::onDataReceived() {
+  for (auto &e : receivers_) {
+    e.notify();
+  }
 }
-bool InterruptI2C::isHardwareBusy(const uint32_t& Timeout) {
-    volatile uint32_t count = Timeout * 15999;
-    do {
-        count = count - 1;
-        if (count == 0U) {
-            return false;
-        }
-    } while (i2c_->SR2 & I2C_SR2_BUSY);
-    return true;
+bool InterruptI2C::isHardwareBusy(const uint32_t &Timeout) {
+  volatile uint32_t count = Timeout * 15999;
+  do {
+    count = count - 1;
+    if (count == 0U) {
+      return false;
+    }
+  } while (i2c_->SR2 & I2C_SR2_BUSY);
+  return true;
 }
