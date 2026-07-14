@@ -13,7 +13,7 @@ typedef struct {
     volatile uint32_t EXTICR3;
     volatile uint32_t EXTICR4;
     volatile uint32_t CMPCR;
-} SYSCFG_TypeDef;
+} SysCfg_TypeDef;
 
 typedef struct {
     volatile uint32_t IMR;
@@ -22,14 +22,14 @@ typedef struct {
     volatile uint32_t FTSR;
     volatile uint32_t SWIER;
     volatile uint32_t PR;
-} EXTI_TypeDef;
+} Exti_TypeDef;
 
 #define SYSCFG_OFFSET (0x3800U)
 #define SYSCFG_BASE (APB2PERIPH_BASE + SYSCFG_OFFSET)
-#define SYSCFG ((SYSCFG_TypeDef*)(SYSCFG_BASE))
+#define SYSCFG_PTR ((SysCfg_TypeDef*)(SYSCFG_BASE))
 
 #define EXTI_OFFSET (0x3C00U)
 #define EXTI_BASE (APB2PERIPH_BASE + EXTI_OFFSET)
-#define EXTI ((EXTI_TypeDef*)(EXTI_BASE))
+#define EXTI_PTR ((Exti_TypeDef*)(EXTI_BASE))
 
 #endif
