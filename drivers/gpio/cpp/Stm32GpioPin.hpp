@@ -46,18 +46,17 @@ struct GPIO_Config {
 
 class Stm32GpioPin {
    private:
-    GPIO_TypeDef* gpio_;
-    GPIO_Config   config_;
+    GPIO_TypeDef* gpio_ = nullptr;
+    uint32_t      pin_  = 0;
 
    public:
-    Stm32GpioPin() {}
-    Stm32GpioPin(GPIO_TypeDef* gpio, const GPIO_Config& config) : gpio_(gpio), config_(config) {}
-    bool       Init(const GPIO_Config& config);
-    void       Write(GPIO_State state);
-    GPIO_State Read();
-    void       Toggle();
-
-   private:
-    void enableGpioClock();
-    bool configurePin();
+    Stm32GpioPin() = default;
+    Result<>   initialize(const GPIO_Config& config);
+    void       write(GPIO_State state);
+    GPIO_State read() const;
+    void       toggle();
 };
+
+namespace Gpio {
+[[nodiscard]] Result<> configureMux(const GPIO_Config& cfg);
+}  // namespace Gpio
