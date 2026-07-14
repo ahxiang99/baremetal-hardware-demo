@@ -6,6 +6,7 @@
 #include "low-level/DMA_registers.h"
 #include "low-level/DMA_types.h"
 
+enum class DMA_Device : uint8_t { DMA_D1, DMA_D2 };
 enum class DMA_Channel : uint8_t { Channel_0, Channel_1, Channel_2, Channel_3, Channel_4, Channel_5, Channel_6, Channel_7 };
 enum class DMA_Stream : uint8_t { Stream_0, Stream_1, Stream_2, Stream_3, Stream_4, Stream_5, Stream_6, Stream_7 };
 enum class DMA_Direction : uint8_t { DMA_PERIPH_TO_MEMORY, DMA_MEMORY_TO_PERIPH, DMA_MEMORY_TO_MEMORY };
@@ -14,7 +15,7 @@ enum class DMA_Peripheral : uint8_t { USART2_RX, USART2_TX, I2C1_RX, I2C1_TX };
 
 struct DMA_Config {
     DMA_Peripheral Peripheral;
-    DMA_TypeDef*   DMA_BaseAddress;
+    DMA_Device     Device;
     DMA_Stream     Stream;
     DMA_Channel    Channel;
     DMA_Direction  Direction;

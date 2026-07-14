@@ -23,5 +23,6 @@ typedef struct {
 } DMA_TypeDef;
 
 #define DMA1 ((DMA_TypeDef*)(AHB1PERIPH_BASE + 0x6000))
+#define DMA2 ((DMA_TypeDef*)(AHB1PERIPH_BASE + 0x6400))
 
 #endif
