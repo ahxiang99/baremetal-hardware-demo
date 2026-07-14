@@ -3,35 +3,26 @@
 #include <atomic>
 
 #include "RegisterUtils.hpp"
+#include "Result.hpp"
 #include "Stm32Uart.hpp"
 #include "cpp/Stm32Uart.hpp"
 #include "drivers.hpp"
 #include "pch.hpp"
 
-Result<bool, UartInitError> InterruptUart::initialize() {
-    // 1. check uart_ not null
-    if (uart_ == nullptr) {
-        return Result<bool, UartInitError>::fail(UartInitError::NullPeripheral);
-    }
-    // 2. check already initialised
-    if (m_Init) {
-        return Result<bool, UartInitError>::fail(UartInitError::AlreadyInitialised);
-    }
-    // 3. call Stm32Uart::initialize()
-    if (Stm32Uart::initialize()) {
-        // 4. call onPostInit()
-        if (!onPostUartInit()) {
-            return Result<bool, UartInitError>::fail(UartInitError::InvalidPostInit);
-        }
-        return Result<bool, UartInitError>::success(true);
-    }
-    // return success or specific error
-    return Result<bool, UartInitError>::fail(UartInitError::InvalidConfig);
+Result<> InterruptUart::initialize(const UartConfig& cfg) {
+    if (m_Init) return Ok();
+
+    // call Stm32Uart::initialize()
+    TRY(Stm32Uart::initialize(cfg));
+
+    // call onPostInit()
+    TRY(onPostUartInit());
+    return Ok();
 }
 
-bool InterruptUart::onPostUartInit() {
-    enableNVICInterrupt();
-    return error_ == UartError::None;
+Result<> InterruptUart::onPostUartInit() {
+    TRY(enable_nvic(uart_));
+    return Ok();
 }
 
 bool InterruptUart::send(const uint8_t* data, size_t DataLength) {
@@ -52,32 +43,32 @@ bool InterruptUart::receive(uint8_t* data, size_t DataLength) {
     }
     RxDataPtr    = data;
     XferDataSize = DataLength;
-    if (rx_state_ == UartState::Error) {
+    if (rx_state_ == UartState_t::Error) {
         // Call Recovery
         RxBuffer  = {};
-        rx_state_ = UartState::Ready;
-        error_    = UartError::None;
+        rx_state_ = UartState_t::Ready;
+        error_    = UartError_t::None;
     }
     start_receive();
     return true;
 }
 
 void InterruptUart::start_transfer() {
-    if (tx_state_ != UartState::Ready) {
+    if (tx_state_ != UartState_t::Ready) {
         return;
     }
 
-    tx_state_ = UartState::BusyTx;
+    tx_state_ = UartState_t::BusyTx;
 
     // Enable Tx Interrupt
     RegisterUtils::setBits(uart_->CR1, USART_CR1_TXEIE);
 }
 
 void InterruptUart::start_receive() {
-    if (rx_state_ != UartState::Ready) {
+    if (rx_state_ != UartState_t::Ready) {
         return;
     }
-    rx_state_ = UartState::BusyRx;
+    rx_state_ = UartState_t::BusyRx;
 
     // Enable Rx Interrupt
     RegisterUtils::setBits(uart_->CR1, USART_CR1_RXNEIE);
@@ -88,17 +79,17 @@ void InterruptUart::onTxInterrupt() {
         uart_->DR = TxBuffer.pop().value();
     } else {
         RegisterUtils::clearBits(uart_->CR1, USART_CR1_TXEIE);
-        tx_state_ = UartState::Ready;
+        tx_state_ = UartState_t::Ready;
     }
 }
 
 void InterruptUart::onRxInterrupt() {
     uint8_t byte = static_cast<uint8_t>(uart_->DR);
-    if (!RxBuffer.is_full() && rx_state_ == UartState::BusyRx) {
+    if (!RxBuffer.is_full() && rx_state_ == UartState_t::BusyRx) {
         RxBuffer.push(byte);
     } else {
-        rx_state_ = UartState::Error;
-        error_    = UartError::Overrun;
+        rx_state_ = UartState_t::Error;
+        error_    = UartError_t::Overrun;
     }
 }
 
@@ -140,7 +131,7 @@ void InterruptUart::processRx() {
     }
 }
 void InterruptUart::recoverTx() {
-    if (tx_state_ == UartState::BusyTx && !TxBuffer.empty()) {
+    if (tx_state_ == UartState_t::BusyTx && !TxBuffer.empty()) {
         // TXEIE may have been lost — re-enable it
         RegisterUtils::setBits(uart_->CR1, USART_CR1_TXEIE);
     }

@@ -8,60 +8,53 @@
 #include "low-level/uart_registers.h"
 #include "low-level/uart_types.h"
 
-enum class UartState : uint8_t { Reset, Ready, BusyTx, BusyRx, Error };
+enum class UartState_t : uint8_t { Reset, Ready, BusyTx, BusyRx, Error };
 
-enum class UartError : uint8_t { None, Timeout, Framing, Overrun, Parity, InvalidConfig };
+enum class UartError_t : uint8_t { None, Timeout, Framing, Overrun, Parity };
 
-enum class UartInitError : uint8_t { NullPeripheral, InvalidBaudRate, InvalidConfig, InvalidPostInit, AlreadyInitialised };
+enum class UartDevice_t : uint8_t { USART_D1, USART_D2, USART_D6, USART_COUNT };
 
-enum class UartNum : uint8_t { USART_D1, USART_D2, USART_D6, Dev_Total };
+enum class UartBaudRate_t : uint32_t { BR_9600 = 9600, BR_115200 = 115200, BR_460800 = 460800, BR_921600 = 921600 };
 
-enum class UartBaudRate : uint16_t { _9600 = 0x683, _115200 = 0x008B };
+enum class UartComm_t : uint8_t { RX_ONLY, TX_ONLY, RX_TX };
 
-enum class UartComm : uint8_t { RX_ONLY, TX_ONLY, RX_TX };
+enum class UartParity_t : uint8_t { NONE, EVEN, ODD };
 
-enum class UartParity : uint8_t { NONE, EVEN, ODD };
-
-enum class UartStopBit : uint8_t { USART_CR2_STOP_1 = 0x00U, USART_CR2_STOP_2 = 0x10U };
+enum class UartStopBit_t : uint8_t { USART_CR2_STOP_1 = 0x00U, USART_CR2_STOP_2 = 0x10U };
 
 struct UartConfig {
-    UartNum      dev_num;
-    UartBaudRate baudRate;
-    UartComm     comm;
-    UartParity   parity;
-    UartStopBit  stopbits;
+    UartDevice_t   dev_num;
+    UartBaudRate_t baudRate;
+    UartComm_t     comm;
+    UartParity_t   parity;
+    UartStopBit_t  stopbits;
 };
 
 class Stm32Uart {
    public:
     Stm32Uart();
-    Stm32Uart(const UartConfig& config);
-    bool initialize();
-    void configure(const UartConfig& config);
-    bool send(const uint8_t* data, size_t DataLength);
-    bool receive(uint8_t* buffer, size_t DataLength);
+    Result<>       initialize(const UartConfig& config);
+    bool           send(const uint8_t* data, size_t DataLength);
+    bool           receive(uint8_t* buffer, size_t DataLength);
+    USART_TypeDef* rawInstance() const;
+    void           disable();
 
    protected:
     USART_TypeDef* uart_;
-    UartConfig     config_;
-    UartState      tx_state_{UartState::Reset};
-    UartState      rx_state_{UartState::Reset};
-    UartError      error_{UartError::None};
+    UartState_t    tx_state_{UartState_t::Reset};
+    UartState_t    rx_state_{UartState_t::Reset};
+    UartError_t    error_{UartError_t::None};
     bool           m_Init = false;
 
     void           clearFlag();
-    void           enableNVICInterrupt();
+    Result<>       enable_nvic(USART_TypeDef* uart);
 
    private:
-    constexpr static uint32_t Timeout = 0x100U;
-    void                      enablePeripheral();
-    void                      disablePeripheral();
+    void setBaudRate(UartBaudRate_t baudrate);
+    void setParity(UartParity_t parity);
+    void setStopBits(UartStopBit_t stopbit);
+    void setComm(UartComm_t comm);
 
-    void                      enablePeripheralClock();
-    void                      disablePeripheralClock();
-
-    void                      configureBaudRate();
-    void                      configureParity();
-    void                      configureStopBits();
-    void                      configureComm();
+   private:
+    static constexpr uint32_t kTimeout = 10;
 };

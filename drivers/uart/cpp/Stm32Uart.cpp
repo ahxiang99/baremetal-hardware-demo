@@ -3,53 +3,71 @@
 #include <cstdint>
 
 #include "RegisterUtils.hpp"
+#include "Result.hpp"
 #include "drivers.hpp"
 #include "low-level/nvic.h"
 #include "low-level/rcc.h"
+#include "low-level/rcc_bitfields.h"
+#include "low-level/uart_bitfields.h"
+#include "low-level/uart_registers.h"
 #include "low-level/uart_types.h"
 
-static const peripherals_regs_table<USART_TypeDef> uart_table[static_cast<uint8_t>(UartNum::Dev_Total)] = {
+namespace {
+static const peripherals_regs_table<USART_TypeDef> uart_table[static_cast<uint8_t>(UartDevice_t::USART_COUNT)] = {
     {USART1, RCC_APB2ENR_USART1_EN, RCC_APB2RSTR_USART1_RST},
     {USART2, RCC_APB1ENR_USART2_EN, RCC_APB1RSTR_USART2_RST},
     {USART6, RCC_APB2ENR_USART6_EN, RCC_APB2RSTR_USART6_RST}
 };
 
-Stm32Uart::Stm32Uart() {}
-
-Stm32Uart::Stm32Uart(const UartConfig& config) : config_(config) {
-    uart_ = uart_table[static_cast<uint8_t>(config_.dev_num)].instance;
+uint32_t BaudRateCalc(uint32_t baud, uint32_t fck, uint32_t over) {
+    float_t nom_usart = (float_t)fck / (float_t)(8U * (2 - over) * baud);
+    float_t div_usart = ceilf((nom_usart - (uint32_t)nom_usart) * 16);
+    return (uint32_t)nom_usart << 4 | (uint32_t)div_usart << 0;
 }
 
-bool Stm32Uart::initialize() {
-    enablePeripheralClock();
-    disablePeripheral();
-    configureComm();
-    configureBaudRate();
-    configureParity();
-    configureStopBits();
-    enablePeripheral();
+USART_TypeDef* enableAndGet(UartDevice_t dev) {
+    const auto& entry = uart_table[static_cast<uint8_t>(dev)];
+    RegisterUtils::setBits(entry.instance == USART2 ? RCC->APB1ENR : RCC->APB2ENR, entry.enableBit);
+    (void)RCC->APB1ENR;
+    (void)RCC->APB2ENR;
+    return entry.instance;
+}
+
+}  // namespace
+
+Stm32Uart::Stm32Uart() : m_Init(false) {}
+
+Result<> Stm32Uart::initialize(const UartConfig& cfg) {
+    uart_ = enableAndGet(cfg.dev_num);
+
+    if (uart_ == nullptr) return Fail(Err::NullInstance);
+
+    /* Disable USART */
+    RegisterUtils::clearBits(uart_->CR1, USART_CR1_UE);
+    setComm(cfg.comm);
+    setBaudRate(cfg.baudRate);
+    setParity(cfg.parity);
+    setStopBits(cfg.stopbits);
+
+    /* Enable USART */
+    RegisterUtils::setBits(uart_->CR1, USART_CR1_UE);
     m_Init = true;
-    return true;
-}
-
-void Stm32Uart::configure(const UartConfig& config) {
-    config_ = config;
-    uart_   = uart_table[static_cast<uint8_t>(config_.dev_num)].instance;
+    return Ok();
 }
 
 bool Stm32Uart::send(const uint8_t* data, size_t DataLength) {
-    if (tx_state_ != UartState::Ready) {
+    if (tx_state_ != UartState_t::Ready) {
         return false;
     }
 
-    tx_state_ = UartState::BusyTx;
+    tx_state_ = UartState_t::BusyTx;
 
     for (size_t i = 0; i < DataLength; ++i) {
         uint32_t start = getDrivers().my_systick.get_ticks();
         while (!(uart_->SR & USART_SR_TXE)) {
-            if (getDrivers().my_systick.get_ticks() - start > Timeout) {
-                tx_state_ = UartState::Error;
-                error_    = UartError::Timeout;
+            if (getDrivers().my_systick.get_ticks() - start > kTimeout) {
+                tx_state_ = UartState_t::Error;
+                error_    = UartError_t::Timeout;
                 return false;
             }
         }
@@ -58,171 +76,91 @@ bool Stm32Uart::send(const uint8_t* data, size_t DataLength) {
 
     uint32_t start = getDrivers().my_systick.get_ticks();
     while (!(uart_->SR & USART_SR_TC)) {
-        if (getDrivers().my_systick.get_ticks() - start > Timeout) {
-            tx_state_ = UartState::Error;
-            error_    = UartError::Timeout;
+        if (getDrivers().my_systick.get_ticks() - start > kTimeout) {
+            tx_state_ = UartState_t::Error;
+            error_    = UartError_t::Timeout;
             return false;
         }
     }
 
-    tx_state_ = UartState::Ready;
+    tx_state_ = UartState_t::Ready;
 
     return true;
 }
 
 bool Stm32Uart::receive(uint8_t* buffer, size_t DataLength) {
-    if (rx_state_ != UartState::Ready) {
+    if (rx_state_ != UartState_t::Ready) {
         return false;
     }
 
-    rx_state_ = UartState::BusyRx;
+    rx_state_ = UartState_t::BusyRx;
 
     for (size_t i = 0; i < DataLength; ++i) {
         uint32_t start = getDrivers().my_systick.get_ticks();
         while (!(uart_->SR & USART_SR_RXNE)) {
-            if (getDrivers().my_systick.get_ticks() - start > Timeout) {
-                rx_state_ = UartState::Error;
-                error_    = UartError::Timeout;
+            if (getDrivers().my_systick.get_ticks() - start > kTimeout) {
+                rx_state_ = UartState_t::Error;
+                error_    = UartError_t::Timeout;
                 return false;
             }
         }
         buffer[i] = uart_->DR;
     }
 
-    rx_state_ = UartState::Ready;
+    rx_state_ = UartState_t::Ready;
     return true;
 }
 
-void Stm32Uart::configureBaudRate() {
-    uart_->BRR = static_cast<uint32_t>(config_.baudRate);
+void Stm32Uart::setBaudRate(UartBaudRate_t baudrate) {
+    uint32_t baud = static_cast<uint32_t>(baudrate);
+    uint32_t fck  = (uart_ == USART2) ? getDrivers().sysclock.getSysClock().apb1 : getDrivers().sysclock.getSysClock().apb2;
+    uart_->BRR    = BaudRateCalc(baud, fck, 0);
 }
 
-void Stm32Uart::configureParity() {
-    // Explicit Bit Cwnership
-    constexpr uint32_t Mask = USART_CR1_PCE | USART_CR1_PS;
-    uint32_t           temp = uart_->CR1;
-    // Only Parity Bit are modified
-    RegisterUtils::clearBits(temp, Mask);
+void Stm32Uart::setParity(UartParity_t parity) {
+    /* Clear Parity Bit Mask First */
+    RegisterUtils::clearBits(uart_->CR1, USART_CR1_PCE | USART_CR1_PS);
 
-    switch (config_.parity) {
-        case UartParity::NONE:
-            // Disable Parity Control Enable
+    switch (parity) {
+        case UartParity_t::NONE:
             break;
-        case UartParity::EVEN:
-            RegisterUtils::setBits(temp, USART_CR1_PCE);
+        case UartParity_t::EVEN:
+            RegisterUtils::setBits(uart_->CR1, USART_CR1_PCE);
             break;
-        case UartParity::ODD:
-            RegisterUtils::setBits(temp, Mask);
-            break;
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
-    uart_->CR1 = temp;
-}
-
-void Stm32Uart::configureStopBits() {
-    constexpr uint32_t Mask = USART_CR2_STOP;
-    uint32_t           temp = uart_->CR2;
-    RegisterUtils::clearBits(temp, Mask);
-    switch (config_.stopbits) {
-        case UartStopBit::USART_CR2_STOP_1:
-            break;
-        case UartStopBit::USART_CR2_STOP_2:
-            RegisterUtils::setBits(temp, static_cast<uint8_t>(UartStopBit::USART_CR2_STOP_2) << 12);
-            break;
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
-    uart_->CR2 = temp;
-}
-
-void Stm32Uart::enablePeripheralClock() {
-    volatile uint32_t* enrReg    = nullptr;
-    uint32_t           enableBit = 0;
-
-    switch (config_.dev_num) {
-        case UartNum::USART_D1: {
-            enrReg    = &RCC->APB2ENR;
-            enableBit = RCC_APB2ENR_USART1_EN;
-            break;
-        }
-        case UartNum::USART_D2: {
-            enrReg    = &RCC->APB1ENR;
-            enableBit = RCC_APB1ENR_USART2_EN;
-            break;
-        }
-        case UartNum::USART_D6: {
-            enrReg    = &RCC->APB2ENR;
-            enableBit = RCC_APB2ENR_USART6_EN;
-            break;
-        }
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
-
-    RegisterUtils::setBits(*enrReg, enableBit);
-
-    // Ensure RCC write completion before peripheral access
-    (void)(*enrReg);
-}
-
-void Stm32Uart::disablePeripheralClock() {
-    volatile uint32_t* clrReg   = nullptr;
-    uint32_t           clearBit = 0;
-
-    switch (config_.dev_num) {
-        case UartNum::USART_D1: {
-            clrReg   = &RCC->APB2ENR;
-            clearBit = RCC_APB2ENR_USART1_EN;
-            break;
-        }
-        case UartNum::USART_D2: {
-            clrReg   = &RCC->APB1ENR;
-            clearBit = RCC_APB1ENR_USART2_EN;
-            break;
-        }
-        case UartNum::USART_D6: {
-            clrReg   = &RCC->APB2ENR;
-            clearBit = RCC_APB2ENR_USART6_EN;
-            break;
-        }
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
-    RegisterUtils::clearBits(*clrReg, clearBit);
-}
-void Stm32Uart::configureComm() {
-    constexpr uint32_t mask = USART_CR1_TE | USART_CR1_RE;
-    uint32_t           temp = uart_->CR1;
-    RegisterUtils::clearBits(temp, mask);
-
-    switch (config_.comm) {
-        case UartComm::RX_ONLY:
-            RegisterUtils::setBits(temp, USART_CR1_RE);
-            rx_state_ = UartState::Ready;
-            break;
-        case UartComm::TX_ONLY:
-            RegisterUtils::setBits(temp, USART_CR1_TE);
-            tx_state_ = UartState::Ready;
-            break;
-        case UartComm::RX_TX:
-            RegisterUtils::setBits(temp, mask);
-            tx_state_ = UartState::Ready;
-            rx_state_ = UartState::Ready;
+        case UartParity_t::ODD:
+            RegisterUtils::setBits(uart_->CR1, USART_CR1_PCE | USART_CR1_PS);
             break;
     }
-    uart_->CR1 = temp;
-}
-void Stm32Uart::enablePeripheral() {
-    RegisterUtils::setBits(uart_->CR1, USART_CR1_UE);
 }
 
-void Stm32Uart::disablePeripheral() {
-    RegisterUtils::clearBits(uart_->CR1, USART_CR1_UE);
+void Stm32Uart::setStopBits(UartStopBit_t stopbit) {
+    switch (stopbit) {
+        case UartStopBit_t::USART_CR2_STOP_1:
+            break;
+        case UartStopBit_t::USART_CR2_STOP_2:
+            RegisterUtils::setBits(uart_->CR2, static_cast<uint8_t>(UartStopBit_t::USART_CR2_STOP_2) << 12);
+            break;
+    }
+}
+
+void Stm32Uart::setComm(UartComm_t comm) {
+    RegisterUtils::clearBits(uart_->CR1, USART_CR1_TE | USART_CR1_RE);
+
+    switch (comm) {
+        case UartComm_t::RX_ONLY:
+            RegisterUtils::setBits(uart_->CR1, USART_CR1_RE);
+            rx_state_ = UartState_t::Ready;
+            break;
+        case UartComm_t::TX_ONLY:
+            RegisterUtils::setBits(uart_->CR1, USART_CR1_TE);
+            tx_state_ = UartState_t::Ready;
+            break;
+        case UartComm_t::RX_TX:
+            RegisterUtils::setBits(uart_->CR1, USART_CR1_TE | USART_CR1_RE);
+            tx_state_ = UartState_t::Ready;
+            rx_state_ = UartState_t::Ready;
+            break;
+    }
 }
 
 void Stm32Uart::clearFlag() {
@@ -232,20 +170,19 @@ void Stm32Uart::clearFlag() {
     (void)temp;
 }
 
-void Stm32Uart::enableNVICInterrupt() {
-    switch (config_.dev_num) {
-        case UartNum::USART_D1:
-            My_NVIC_EnableIRQ(USART1_IRQn);
-            break;
-        case UartNum::USART_D2:
-            My_NVIC_EnableIRQ(USART2_IRQn);
-            break;
+USART_TypeDef* Stm32Uart::rawInstance() const {
+    return uart_;
+}
 
-        case UartNum::USART_D6:
-            My_NVIC_EnableIRQ(USART6_IRQn);
-            break;
-        case UartNum::Dev_Total:
-            error_ = UartError::InvalidConfig;
-            break;
+Result<> Stm32Uart::enable_nvic(USART_TypeDef* dev) {
+    if (dev == USART1) {
+        My_NVIC_EnableIRQ(USART1_IRQn);
+    } else if (dev == USART2) {
+        My_NVIC_EnableIRQ(USART2_IRQn);
+    } else if (dev == USART6) {
+        My_NVIC_EnableIRQ(USART6_IRQn);
+    } else {
+        return Fail(Err::NullInstance);
     }
+    return Ok();
 }

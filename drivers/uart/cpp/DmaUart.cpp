@@ -16,30 +16,27 @@
 
 DmaUart::DmaUart() {}
 
-void DmaUart::configure(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg) {
-    Stm32Uart::configure(uart_cfg);
+Result<> DmaUart::initialize(const UartConfig& uart_cfg, const DMA_Config& txdma_cfg, const DMA_Config& rxdma_cfg) {
+    if (m_Init) {
+        return Ok();
+    }
+    /* Setup DMA Config */
     hdmatx.setConfig(txdma_cfg);
     hdmarx.setConfig(rxdma_cfg);
-}
 
-Result<bool, UartInitError> DmaUart::initialize() {
+    TRY(Stm32Uart::initialize(uart_cfg));
+
     if (uart_ == nullptr) {
-        return Result<bool, UartInitError>::fail(UartInitError::NullPeripheral);
+        return Fail(Err::NullInstance);
     }
-    if (m_Init) {
-        return Result<bool, UartInitError>::fail(UartInitError::AlreadyInitialised);
-    }
-    if (Stm32Uart::initialize()) {
-        onPostUartInit();
-        return Result<bool, UartInitError>::success(true);
-    } else {
-        return Result<bool, UartInitError>::fail(UartInitError::InvalidConfig);
-    }
+
+    onPostUartInit();
+    m_Init = true;
+    return Ok();
 }
 
 void DmaUart::onPostUartInit() {
-    Stm32Uart::enableNVICInterrupt();
-    enable_DMA_request();
+    enable_nvic(uart_);
     initDmaTx();
     initDmaRx();
     startNextDmaReceive();
@@ -65,7 +62,7 @@ void DmaUart::initDmaTx() {
     hdmatx.setXferCpltCallback(
         [](void* ctx) {
             auto* self      = static_cast<DmaUart*>(ctx);
-            self->tx_state_ = UartState::Ready;
+            self->tx_state_ = UartState_t::Ready;
             self->startNextDmaTransfer();
         },
         this);
@@ -87,42 +84,22 @@ void DmaUart::initDmaRx() {
     hdmarx.StartDataStream((uint32_t)&uart_->DR, rxBuffer.data_ptr(), BUFF_SIZE);
 }
 
-void DmaUart::enable_DMA_request() {
-    switch (config_.comm) {
-        case UartComm::RX_ONLY:
-            RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAR);
-            rxEnabled = true;
-            break;
-        case UartComm::TX_ONLY:
-            RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAT);
-            break;
-        case UartComm::RX_TX:
-            RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAT);
-            RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAR);
-            rxEnabled = true;
-            break;
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
+void DmaUart::enableTxDmaRequest() {
+    RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAT);
 }
 
-void DmaUart::disable_DMA_request() {
-    switch (config_.comm) {
-        case UartComm::RX_ONLY:
-            RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAR);
-            break;
-        case UartComm::TX_ONLY:
-            RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAT);
-            break;
-        case UartComm::RX_TX:
-            RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAT);
-            RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAR);
-            break;
-        default:
-            error_ = UartError::InvalidConfig;
-            return;
-    }
+void DmaUart::enableRxDmaRequest() {
+    RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAT);
+    RegisterUtils::setBits(uart_->CR3, USART_CR3_DMAR);
+}
+
+void DmaUart::disableTxDmaRequest() {
+    RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAT);
+}
+
+void DmaUart::disableRxDmaRequest() {
+    RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAT);
+    RegisterUtils::clearBits(uart_->CR3, USART_CR3_DMAR);
 }
 
 void DmaUart::handleTxDmaInterrupt() {
@@ -135,18 +112,19 @@ void DmaUart::handleRxDmaInterrupt() {
 
 bool DmaUart::startNextDmaTransfer() {
     if (txBuffer.empty()) {
+        disableTxDmaRequest();
         return false;
     }
 
-    if (tx_state_ == UartState::Ready) {
-        tx_state_     = UartState::BusyTx;
+    if (tx_state_ == UartState_t::Ready) {
+        tx_state_     = UartState_t::BusyTx;
 
         uint32_t Size = (txBuffer.size() > CHUNK_SIZE) ? CHUNK_SIZE : txBuffer.size();
 
         for (size_t i = 0; i < Size; ++i) {
             dmaTxBuffer.at(i) = txBuffer.pop().value();
         }
-
+        enableTxDmaRequest();
         hdmatx.StartDataStream(reinterpret_cast<uint32_t>(dmaTxBuffer.data()), (uint32_t)&uart_->DR, Size);
         return true;
     } else {
@@ -157,7 +135,7 @@ bool DmaUart::startNextDmaTransfer() {
 bool DmaUart::startNextDmaReceive() {
     if (!rxEnabled) return false;
 
-    rx_state_ = UartState::BusyRx;
+    rx_state_ = UartState_t::BusyRx;
     if (!(uart_->CR1 & USART_CR1_IDLEIE)) {
         RegisterUtils::setBits(uart_->CR1, USART_CR1_IDLEIE);
     }
@@ -205,7 +183,7 @@ void DmaUart::handleInterrupt() {
         onIdleInterrupt();
     } else if (sr & USART_SR_ORE) {
         clearFlag();
-        error_ = UartError::Overrun;
+        error_ = UartError_t::Overrun;
         rxBuffer.sync_dma_head(hdmarx.getDmaStream()->NDTR);
     }
 }
