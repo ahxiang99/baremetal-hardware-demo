@@ -77,11 +77,15 @@ OLED_Display::Font_TypeDef font5x7 = {.width = 5, .height = 7, .data = font5x7_d
 
 OLED_Display::OLED_Display() {}
 
-void OLED_Display::Initialize(const Stm32Spi& spi_) {
+Result<> OLED_Display::Initialize(const Stm32Spi& spi_) {
     hspi = spi_;
-    Rst_Pin.Init(RST_CFG);
-    DC_Pin.Init(DC_CFG);
-    CS_Pin.Init(CS_CFG);
+
+    if (hspi.rawInstance() == nullptr) return Fail(Err::NullInstance);
+
+    TRY(Rst_Pin.initialize(RST_CFG));
+    TRY(DC_Pin.initialize(DC_CFG));
+    TRY(CS_Pin.initialize(CS_CFG));
+
     CurrentX = 0;
     CurrentY = 0;
 
@@ -114,6 +118,8 @@ void OLED_Display::Initialize(const Stm32Spi& spi_) {
 
     Fill(0x00);
     Flush();
+
+    return Ok();
 }
 
 void OLED_Display::Contrast(uint8_t contrast) {
@@ -273,22 +279,22 @@ void OLED_Display::Show(char* buf, uint8_t x, uint8_t y, uint8_t page) {
 }
 
 void OLED_Display::Rst_Pin_L() {
-    Rst_Pin.Write(GPIO_State::LOW);
+    Rst_Pin.write(GPIO_State::LOW);
 }
 void OLED_Display::Rst_Pin_H() {
-    Rst_Pin.Write(GPIO_State::HIGH);
+    Rst_Pin.write(GPIO_State::HIGH);
 }
 void OLED_Display::DC_Pin_L() {
-    DC_Pin.Write(GPIO_State::LOW);
+    DC_Pin.write(GPIO_State::LOW);
 }
 void OLED_Display::DC_Pin_H() {
-    DC_Pin.Write(GPIO_State::HIGH);
+    DC_Pin.write(GPIO_State::HIGH);
 }
 void OLED_Display::CS_Pin_L() {
-    CS_Pin.Write(GPIO_State::LOW);
+    CS_Pin.write(GPIO_State::LOW);
 }
 void OLED_Display::CS_Pin_H() {
-    CS_Pin.Write(GPIO_State::HIGH);
+    CS_Pin.write(GPIO_State::HIGH);
 }
 void OLED_Display::cmd(uint8_t cmd) {
     DC_Pin_L();
@@ -298,4 +304,12 @@ void OLED_Display::cmd_double(uint8_t cmd1, uint8_t cmd2) {
     DC_Pin_L();
     uint8_t command[2]{cmd1, cmd2};
     hspi.transferOnly(command, 2);
+}
+void OLED_Display::DisplayOn() {
+    ControlPin cs(CS_Pin);
+    cmd(SSD1306_CMD_DISP_ON);
+}
+void OLED_Display::DisplayOff() {
+    ControlPin cs(CS_Pin);
+    cmd(SSD1306_CMD_DISP_OFF);
 }
