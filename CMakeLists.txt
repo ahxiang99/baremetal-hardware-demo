@@ -65,6 +65,8 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/middleware/SSD1306/oled_SSD1306.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X/Sht40ad1b.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/startup_stm32f401xx.S
 )
 
@@ -89,6 +91,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/sensors
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X
 )
 
 # Include directories for each compiler
