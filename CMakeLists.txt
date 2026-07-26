@@ -64,6 +64,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/middleware/SSD1306/oled_SSD1306.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X/Sht40ad1b.cpp
@@ -87,6 +88,7 @@ set(include_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/pwr
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/middleware

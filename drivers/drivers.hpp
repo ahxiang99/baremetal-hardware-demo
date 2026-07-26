@@ -11,6 +11,7 @@
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/Stm32Uart.hpp"
 #include "cpp/systick.hpp"
+#include "cpp/wwdg.hpp"
 #include "rtc/cpp/Stm32RTC.hpp"
 
 template <typename T> struct peripherals_regs_table {
@@ -31,6 +32,7 @@ struct Drivers {
 	ExtiInput user_button;
 	OLED_Display disp;
 	InterruptUart uart1;
+	WindowWatchDog wwdg;
 };
 
 Drivers &getDrivers();

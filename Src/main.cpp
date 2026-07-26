@@ -97,12 +97,25 @@ int main()
 
 	uint32_t measure_start = g.my_systick.get_ticks();
 	uint32_t disp_start = g.my_systick.get_ticks();
+	uint32_t wwdg_refresh_start = g.my_systick.get_ticks();
 
 	while (1) {
 		const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
 
 		g.i2c1.processRx();
 		g.user_button.processEvent();
+
+		/* Feed the watchdog on its own cadence, inside the ~29-50ms window the
+		   configured prescaler/window/reload actually allows a refresh (the WWDG's
+		   window is far shorter than the 100ms sensor-poll timer below, so it must
+		   not be gated on that). Skipped while the sensor reports a fault so a
+		   stuck I2C bus lets the WWDG time out and reset the board. */
+		if (g.my_systick.get_ticks() - wwdg_refresh_start > 35) {
+			if (temp_sensor.getFaultStatus().isOk()) {
+				g.wwdg.resetCounter();
+			}
+			wwdg_refresh_start = g.my_systick.get_ticks();
+		}
 
 		/* Timer to keep firing read command when it is elapsed.*/
 		if (g.timer.isElapsed()) {
@@ -167,6 +180,10 @@ int main()
 				cmd.fn(cmd.ctx);
 			}
 		}
+
+		/* Sleep until the next interrupt (SysTick/DMA/UART/EXTI) instead of busy-spinning
+		 */
+		__WFI();
 	}
 	return 0;
 }

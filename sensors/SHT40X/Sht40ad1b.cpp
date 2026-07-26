@@ -31,8 +31,10 @@ bool Sht40ad1b::read()
 	if (hi2c.Write(DevAddr, &byte, sizeof(byte), kTimeOut)) {
 		m_State = SensorState::MEASURING;
 		measure_start_time = getDrivers().my_systick.get_ticks();
+		noteSuccess();
 		return true;
 	} else {
+		noteFailure(Err::HwFault);
 		return false;
 	}
 }
@@ -45,6 +47,7 @@ void Sht40ad1b::ProcessData()
 				m_State = SensorState::WAIT_DATA;
 			} else {
 				m_State = SensorState::IDLE;
+				noteFailure(Err::HwFault);
 			}
 		}
 	} else if (m_State == SensorState::DATA_READY) {
@@ -56,6 +59,8 @@ void Sht40ad1b::ProcessData()
 			m_data.temperature =
 				-45.0f + (175.0f * (float_t)temp_value_raw / (float_t)0xFFFF);
 		} else {
+			LOG_WARN("SHT40: temperature CRC mismatch (got {}, raw={})",
+				 (uint32_t)temp_value_crc, (uint32_t)temp_value_raw);
 			m_data.temperature = 0.0f;
 		}
 
@@ -68,14 +73,48 @@ void Sht40ad1b::ProcessData()
 				m_data.humidity = 100;
 			}
 		} else {
+			LOG_WARN("SHT40: humidity CRC mismatch (got {}, raw={})",
+				 (uint32_t)rh_value_crc, (uint32_t)rh_value_raw);
 			m_data.humidity = 0.0f;
 		}
 		m_State = SensorState::IDLE;
 	} else if (m_State == SensorState::WAIT_DATA) {
 		if (getDrivers().my_systick.get_ticks() - measure_start_time > 50) {
 			m_State = SensorState::IDLE;
+			noteFailure(Err::Timeout);
 		}
 	}
+}
+
+Result<Unit, Err> Sht40ad1b::getFaultStatus() const
+{
+	if (m_lastError == Err::None) {
+		return Ok();
+	}
+	return Result<Unit, Err>::fail(m_lastError);
+}
+
+void Sht40ad1b::clearFault()
+{
+	m_lastError = Err::None;
+	m_retryCount = 0;
+}
+
+void Sht40ad1b::noteFailure(Err err)
+{
+	if (m_retryCount <= kMaxRetries) {
+		++m_retryCount;
+	}
+	if (m_retryCount > kMaxRetries && m_lastError != err) {
+		m_lastError = err;
+		LOG_ERROR("SHT40: sensor fault after {} consecutive failures (err={})",
+			  (uint32_t)m_retryCount, (uint32_t)err);
+	}
+}
+
+void Sht40ad1b::noteSuccess()
+{
+	m_retryCount = 0;
 }
 Sht40ad1b::SensorState Sht40ad1b::getState() const
 {

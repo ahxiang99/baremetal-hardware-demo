@@ -175,17 +175,75 @@ void initRtc(Drivers &g)
 	checkOk(g.rtc.initialize(), BootTag::Rtc);
 	LOG_INFO("RTC Up");
 }
+
+void initWatchdog(Drivers &g)
+{
+	g.wwdg.initialize(board::clock_tree.apb1);
+	LOG_INFO("WWDG Up");
+}
+
+void logResetCause(uint32_t csr)
+{
+	if (csr & RCC_CSR_WWDGRSTF) {
+		LOG_WARN("Reset cause: Window Watchdog (sensor/loop lockup)");
+	}
+	if (csr & RCC_CSR_IWDGRSTF) {
+		LOG_WARN("Reset cause: Independent Watchdog");
+	}
+	if (csr & RCC_CSR_BORRSTF) {
+		LOG_WARN("Reset cause: Brown-out");
+	}
+	if (csr & RCC_CSR_PINRSTF) {
+		LOG_INFO("Reset cause: NRST pin");
+	}
+	if (csr & RCC_CSR_PORRSTF) {
+		LOG_INFO("Reset cause: Power-on");
+	}
+	if (csr & RCC_CSR_SFTRSTF) {
+		LOG_INFO("Reset cause: Software reset");
+	}
+	if (csr & RCC_CSR_LPWRRSTF) {
+		LOG_WARN("Reset cause: Low-power mode exit");
+	}
+}
+
+void logPanicBreadcrumb(uint32_t breadcrumb)
+{
+	if ((breadcrumb & 0xFFFF0000u) != 0xDEAD0000u) {
+		return;
+	}
+	const auto tag = static_cast<BootTag>((breadcrumb >> 8) & 0xFF);
+	const uint32_t err = breadcrumb & 0xFF;
+	LOG_ERROR("Previous boot panicked: tag={}, err={}", static_cast<uint32_t>(tag), err);
+}
+
+void logBootDiagnostics(uint32_t csr, uint32_t breadcrumb)
+{
+	logResetCause(csr);
+	logPanicBreadcrumb(breadcrumb);
+
+	/* Clear breadcrumb and reset-cause flags so the next boot's read is clean */
+	_PWR->CR |= PWR_CR_DBP;
+	RTC->BKP0R[5] = 0;
+	RegisterUtils::setBits(RCC->CSR, RCC_CSR_RMVF);
+}
 } // namespace
 
 void initDriver(Drivers &g)
 {
+	/* Snapshot reset-cause and last panic breadcrumb before anything clears them */
+	const uint32_t bootCsr = RCC->CSR;
+	const uint32_t bootBreadcrumb = RTC->BKP0R[5];
+
 	initCore(g);
 	initGpioMux();
 	initComms(g);
+	logBootDiagnostics(bootCsr, bootBreadcrumb);
 	initIo(g);
 	initExti(g);
 	initTimer(g);
 	initRtc(g);
 	initDisplay(g);
+	initWatchdog(g);
 	LOG_INFO("Boot complete");
 }
