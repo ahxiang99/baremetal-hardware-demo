@@ -9,10 +9,10 @@
 #include "low-level/uart_registers.h"
 
 template <typename T>
-concept UartDevice = requires(T uart_, const uint8_t* data, uint8_t* buf, size_t len) {
-    { uart_.send(data, len) } -> std::convertible_to<bool>;
-    { uart_.receive(buf, len) } -> std::convertible_to<bool>;
-    { uart_.rawInstance() } -> std::convertible_to<USART_TypeDef*>;
+concept UartDevice = requires(T uart_, std::span<const uint8_t> data, std::span<uint8_t> buf) {
+	{ uart_.send(data) } -> std::convertible_to<bool>;
+	{ uart_.receive(buf) } -> std::convertible_to<bool>;
+	{ uart_.rawInstance() } -> std::convertible_to<USART_TypeDef *>;
 };
 
 static_assert(UartDevice<Stm32Uart>, "Must be Uart Class");

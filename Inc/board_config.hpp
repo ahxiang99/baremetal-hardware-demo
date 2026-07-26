@@ -31,7 +31,7 @@ inline constexpr GPIO_Config gpio_cfg{.pin = GPIO_PIN_2 | GPIO_PIN_3,
 				      .afr = GPIO_AFR::GPIO_AF7_USART1_2};
 inline constexpr UartConfig cfg{.dev_num = UartDevice_t::USART_D2,
 				.baudRate = UartBaudRate_t::BR_9600,
-				.comm = kCliEnable ? UartComm_t::RX_TX : UartComm_t::TX_ONLY,
+				.comm = UartComm_t::RX_TX,
 				.parity = UartParity_t::NONE,
 				.stopbits = UartStopBit_t::USART_CR2_STOP_1};
 

@@ -22,7 +22,6 @@ const size_t CHUNK_SIZE = 64;
 const size_t BUFF_SIZE = 128;
 const uint32_t HSI_Freq_Hz = 16000000;
 
-constexpr bool kCliEnable = false;
 constexpr bool kSensorEnable = true;
 constexpr bool kSendPacket = false;
 constexpr bool kOxiMeterEnable = false;

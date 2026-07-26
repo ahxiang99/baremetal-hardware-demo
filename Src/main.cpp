@@ -175,15 +175,13 @@ int main()
 
 void register_fn_callback()
 {
-	if constexpr (kCliEnable) {
-		getDrivers().uart2.onDataReceived(
-			[](void *ctx, const uint8_t *data, size_t len) {
-				static_cast<Cli *>(ctx)->onUartData(data, len);
-			},
-			&cmd);
-		cmd.setUart(UartRef::from(getDrivers().uart2));
-		cmd.setSensor(&temp_sensor);
-	}
+	getDrivers().uart2.onDataReceived(
+		[](void *ctx, const uint8_t *data, size_t len) {
+			static_cast<Cli *>(ctx)->onUartData(data, len);
+		},
+		&cmd);
+	cmd.setUart(UartRef::from(getDrivers().uart2));
+	cmd.setSensor(&temp_sensor);
 
 	if constexpr (kSensorEnable) {
 		getDrivers().i2c1.addReceiver(temp_sensor);
@@ -207,6 +205,7 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 			LOG_INFO("STTS2H: Temp: {}", stts_temp.getTemp());
 			measure_start = g.my_systick.get_ticks();
 		}
+		break;
 	}
 	case AppMode::SendPacket: {
 		static uint16_t seq = 0;
@@ -222,9 +221,9 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 			};
 			Packet<Env_Sensor_Data, PacketType::VERSION_0> pkt_sht40{sht40_data};
 			Packet<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-			g.uart2.send(pkt_sht40.raw(), pkt_sht40.size());
-			g.uart2.send(stts2h_data.raw(), stts2h_data.size());
-			g.uart1.send(pkt_sht40.raw(), pkt_sht40.size());
+			g.uart2.send({pkt_sht40.raw(), pkt_sht40.size()});
+			g.uart2.send({stts2h_data.raw(), stts2h_data.size()});
+			g.uart1.send({pkt_sht40.raw(), pkt_sht40.size()});
 			measure_start = g.my_systick.get_ticks();
 		}
 		break;

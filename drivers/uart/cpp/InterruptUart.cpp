@@ -26,29 +26,31 @@ Result<> InterruptUart::initialize(const UartConfig &cfg)
 Result<> InterruptUart::onPostUartInit()
 {
 	TRY(enable_nvic(uart_));
+	start_receive();
 	return Ok();
 }
 
-bool InterruptUart::send(const uint8_t *data, size_t DataLength)
+bool InterruptUart::send(std::span<const uint8_t> data)
 {
-	if (DataLength <= 0 || data == nullptr) {
+	if (data.empty()) {
 		return false;
 	}
 
-	for (size_t i = 0; i < DataLength; ++i) {
+	for (size_t i = 0; i < data.size(); ++i) {
 		TxBuffer.push(data[i]);
 	}
 	start_transfer();
 	return true;
 }
 
-bool InterruptUart::receive(uint8_t *data, size_t DataLength)
+bool InterruptUart::receive(std::span<uint8_t> buf)
 {
-	if (DataLength <= 0 || data == nullptr) {
+	if (buf.data() == nullptr) {
 		return false;
 	}
-	RxDataPtr = data;
-	XferDataSize = DataLength;
+
+	RxDataPtr = buf.data();
+	XferDataSize = buf.size();
 	if (rx_state_ == UartState_t::Error) {
 		// Call Recovery
 		RxBuffer = {};
@@ -108,10 +110,7 @@ void InterruptUart::handleInterrupt()
 	const uint32_t sr = uart_->SR;
 	if (sr & USART_SR_RXNE) {
 		onRxInterrupt();
-		XferDataSize--;
-		if (XferDataSize == 0) {
-			rxEventFlag.store(true, std::memory_order_release);
-		}
+		rxEventFlag.store(true, std::memory_order_release);
 	}
 	if (sr & USART_SR_TXE) {
 		onTxInterrupt();
@@ -134,16 +133,15 @@ void InterruptUart::processRx()
 
 	if (fn_) {
 		// Pop data from Rx Buffer and Send to Function.
-
-		size_t transfer_size = RxBuffer.size() > CHUNK_SIZE ? CHUNK_SIZE : RxBuffer.size();
-
-		for (size_t i = 0; i < transfer_size; ++i) {
+		int len = RxBuffer.size();
+		std::array<uint8_t, 4> buf;
+		for (size_t i = 0; i < len; ++i) {
 			auto byte = RxBuffer.pop();
-			if (byte.has_value() && RxDataPtr) {
-				RxDataPtr[i] = byte.value();
+			if (byte.has_value()) {
+				buf[i] = byte.value();
 			}
 		}
-		fn_(ctx_, RxDataPtr, transfer_size);
+		fn_(ctx_, buf.data(), len);
 	}
 }
 void InterruptUart::recoverTx()

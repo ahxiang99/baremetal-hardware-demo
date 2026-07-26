@@ -12,8 +12,8 @@ class InterruptUart: public Stm32Uart
 	using rxCallback = void (*)(void *ctx, const uint8_t *pData, size_t len);
 
 	Result<> initialize(const UartConfig &cfg);
-	bool send(const uint8_t *data, size_t DataLength);
-	bool receive(uint8_t *data, size_t DataLength);
+	bool send(std::span<const uint8_t> data);
+	bool receive(std::span<uint8_t> buf);
 
 	void handleInterrupt();
 	void onDataReceived(rxCallback cb, void *ctx);
