@@ -27,7 +27,7 @@ class InterruptUart: public Stm32Uart
 	void recoverTx() const;
 
       private:
-	RingBuffer<uint8_t, BUFF_SIZE> TxBuffer;
+	RingBuffer<uint8_t, BUFF_SIZE * 16> TxBuffer;
 	RingBuffer<uint8_t, BUFF_SIZE> RxBuffer;
 	std::atomic_bool rxEventFlag{false};
 	rxCallback fn_ = nullptr;
