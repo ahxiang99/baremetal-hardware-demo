@@ -17,7 +17,7 @@ class DmaUart: public Stm32Uart
 	using RxCallbackFn = void (*)(void *, const uint8_t *, size_t);
 
       public:
-	DmaUart();
+	DmaUart() = default;
 	void configure();
 	Result<> initialize(const UartConfig &uart_cfg, const DMA_Config &txdma_cfg,
 			    const DMA_Config &rxdma_cfg);
@@ -42,7 +42,7 @@ class DmaUart: public Stm32Uart
 	IDma hdmatx;
 	IDma hdmarx;
 
-	RingBuffer<uint8_t, BUFF_SIZE> txBuffer;
+	RingBuffer<uint8_t, BUFF_SIZE * 16> txBuffer;
 	std::array<uint8_t, BUFF_SIZE> dmaTxBuffer;
 	RingBuffer<uint8_t, BUFF_SIZE> rxBuffer;
 

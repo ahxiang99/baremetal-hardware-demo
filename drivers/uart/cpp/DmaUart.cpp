@@ -14,10 +14,6 @@
 #include "low-level/uart_bitfields.h"
 #include "pch.hpp"
 
-DmaUart::DmaUart()
-{
-}
-
 Result<> DmaUart::initialize(const UartConfig &uart_cfg, const DMA_Config &txdma_cfg,
 			     const DMA_Config &rxdma_cfg)
 {
