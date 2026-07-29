@@ -347,6 +347,9 @@ void Stm32I2C::Error_Handler()
 	case i2c_error_t::ERR_I2C_BUSY:
 		LOG_ERROR("I2C Bus Busy");
 		break;
+	case i2c_error_t::ERR_I2C_DATA_EMPTY:
+		LOG_ERROR("I2C Data Empty");
+		break;
 	}
 	// Soft-reset the peripheral so the next Write/Read call can retry cleanly.
 	// A full re-initialize() is unnecessary — CR1/CR2/CCR/TRISE are still valid.
