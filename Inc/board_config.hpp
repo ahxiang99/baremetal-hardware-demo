@@ -92,6 +92,23 @@ inline constexpr i2c_config_t cfg{
 	.DualAddressMode = 0,
 	.OwnAddress2 = 0,
 };
+
+inline constexpr DMA_Config config_tx{
+	.Device = DMA_Device::DMA_D1,
+	.Stream = DMA_Stream::Stream_7,
+	.Channel = DMA_Channel::Channel_1,
+	.Direction = DMA_Direction::DMA_MEMORY_TO_PERIPH,
+	.Mode = DMA_Mode::Normal,
+};
+
+inline constexpr DMA_Config config_rx{
+	.Device = DMA_Device::DMA_D1,
+	.Stream = DMA_Stream::Stream_0,
+	.Channel = DMA_Channel::Channel_1,
+	.Direction = DMA_Direction::DMA_PERIPH_TO_MEMORY,
+	.Mode = DMA_Mode::Normal,
+};
+
 } // namespace i2c1
 
 namespace spi1
