@@ -5,7 +5,6 @@
 #include "RegisterUtils.hpp"
 #include "Result.hpp"
 #include "Stm32Uart.hpp"
-#include "cpp/Stm32Uart.hpp"
 #include "drivers.hpp"
 #include "pch.hpp"
 
@@ -36,9 +35,10 @@ bool InterruptUart::send(std::span<const uint8_t> data)
 		return false;
 	}
 
-	for (size_t i = 0; i < data.size(); ++i) {
-		TxBuffer.push(data[i]);
+	for (auto byte : data) {
+		TxBuffer.push(byte);
 	}
+	
 	start_transfer();
 	return true;
 }
@@ -96,7 +96,7 @@ void InterruptUart::onTxInterrupt()
 
 void InterruptUart::onRxInterrupt()
 {
-	uint8_t byte = static_cast<uint8_t>(uart_->DR);
+	auto byte = static_cast<uint8_t>(uart_->DR);
 	if (!RxBuffer.is_full() && rx_state_ == UartState_t::BusyRx) {
 		RxBuffer.push(byte);
 	} else {
@@ -133,7 +133,7 @@ void InterruptUart::processRx()
 
 	if (fn_) {
 		// Pop data from Rx Buffer and Send to Function.
-		int len = RxBuffer.size();
+		size_t len = RxBuffer.size();
 		std::array<uint8_t, 4> buf;
 		for (size_t i = 0; i < len; ++i) {
 			auto byte = RxBuffer.pop();
@@ -144,7 +144,7 @@ void InterruptUart::processRx()
 		fn_(ctx_, buf.data(), len);
 	}
 }
-void InterruptUart::recoverTx()
+void InterruptUart::recoverTx() const
 {
 	if (tx_state_ == UartState_t::BusyTx && !TxBuffer.empty()) {
 		// TXEIE may have been lost — re-enable it
