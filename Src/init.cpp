@@ -7,6 +7,8 @@
 #include "drivers.hpp"
 #include "logger.hpp"
 #include "pch.hpp"
+#include "cpp/InterruptI2C.hpp"
+
 #include <typeinfo>
 
 namespace
@@ -17,6 +19,7 @@ enum class BootTag : uint8_t {
 	GpioMux,
 	Led,
 	Uart2,
+	Uart1,
 	I2c1,
 	Exti,
 	Rtc,
@@ -25,12 +28,13 @@ enum class BootTag : uint8_t {
 };
 
 template <typename T1, typename T2, typename T3, typename T4>
-void initializeUart(T1 &uart, T2 &&cfg, T3 &&tx_cfg, T4 &&rx_cfg)
+void init_device_has_dma(T1 &dev, T2 &&cfg, T3 &&tx_cfg, T4 &&rx_cfg, BootTag tag)
 {
-	if constexpr (std::is_same_v<T1, DmaUart>) {
-		checkOk(uart.initialize(cfg, tx_cfg, rx_cfg), BootTag::Uart2);
-	} else if constexpr (std::is_same_v<T1, InterruptUart>) {
-		checkOk(uart.initialize(cfg), BootTag::Uart2);
+	if constexpr (std::is_same_v<T1, DmaUart> || std::is_same_v<T1, DmaI2C>) {
+		checkOk(dev.initialize(cfg, tx_cfg, rx_cfg), tag);
+	} else if constexpr (std::is_same_v<T1, InterruptUart> ||
+			     std::is_same_v<T1, InterruptI2C>) {
+		checkOk(dev.initialize(cfg), tag);
 	}
 }
 
@@ -108,21 +112,23 @@ void initCore(Drivers &g)
 	enableFpu();
 	g.sysclock.initialize(board::sys_cfg_84, board::clock_tree);
 	g.my_systick.init();
+
+	Logger::Init(UartRef::from(g.uart2));
+	Logger::set_level(LogLevel::INFO);
+	LOG_PRINT("\n");
 	LOG_INFO("AHB: {}, APB1: {}, APB2: {}", board::clock_tree.ahb, board::clock_tree.apb1,
 		 board::clock_tree.apb2);
 }
 
 void initComms(Drivers &g)
 {
-	initializeUart(g.uart2, board::uart2::cfg, board::uart2::hdmatx_cfg,
-		       board::uart2::hdmarx_cfg);
-	Logger::Init(UartRef::from(g.uart2));
-	Logger::set_level(LogLevel::INFO);
+	init_device_has_dma(g.uart2, board::uart2::cfg, board::uart2::hdmatx_cfg,
+			    board::uart2::hdmarx_cfg, BootTag::Uart1);
 	LOG_INFO("UART2 up");
 
-	initializeUart(g.uart1, board::uart1::cfg, nullptr, nullptr);
-
-	checkOk(g.i2c1.initialize(board::i2c1::cfg), BootTag::I2c1);
+	init_device_has_dma(g.uart1, board::uart1::cfg, nullptr, nullptr, BootTag::Uart1);
+	init_device_has_dma(g.i2c1, board::i2c1::cfg, board::i2c1::config_tx,
+			    board::i2c1::config_rx, BootTag::I2c1);
 	LOG_INFO("I2C1 up");
 }
 

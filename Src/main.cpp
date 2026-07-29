@@ -24,6 +24,7 @@
 #include "low-level/syscfg_registers.h"
 #include "pch.hpp"
 #include "stts2h.hpp"
+#include "low-level/i2c_bitfields.h"
 
 // Global Variables
 Sht40ad1b temp_sensor(I2C_Ref::from(getDrivers().i2c1));
@@ -37,32 +38,6 @@ std::atomic<AppMode> g_AppMode{AppMode::Console};
 void register_fn_callback();
 void appModeOperation(Drivers &, uint32_t &);
 void oled_screen_update(Drivers &, uint32_t &);
-
-void i2c_address_scan()
-{
-	constexpr i2c_config_t i2c_config{
-		.DevNum = i2c_device_t::I2C_D1,
-		.ClockFreq = i2c_freq_t::_100KHz,
-		.OwnAddress1 = 0,
-		.AddressingMode = i2c_addressmode_t::AddressMode_7Bit,
-		.DualAddressMode = 0,
-		.OwnAddress2 = 0,
-	};
-	Stm32I2C i2c;
-	i2c.initialize(i2c_config);
-
-	for (size_t i = 0x00; i <= 0x7F; i++) {
-		const uint8_t data = 0;
-		if (i2c.Write(i << 1, &data, 1, 3)) {
-			LOG_INFO("Address: {} is valid", (Hex)i);
-			break;
-		} else {
-			LOG_INFO("Address: {} is not valid", (Hex)i);
-			RegisterUtils::clearBits(I2C1->SR1, 1 << 10);
-			RegisterUtils::setBits(I2C1->CR1, 1 << 9);
-		}
-	}
-}
 
 /* Main Program Start Here */
 int main()
@@ -236,8 +211,9 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 				.rh_x100 =
 					static_cast<int16_t>(temp_sensor.getValue().humidity * 100),
 			};
-			Packet<Env_Sensor_Data, PacketType::VERSION_0> pkt_sht40{sht40_data};
-			Packet<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
+			const Packet<Env_Sensor_Data, PacketType::VERSION_0> pkt_sht40{sht40_data};
+			const Packet<float_t, PacketType::VERSION_2> stts2h_data{
+				stts_temp.getTemp()};
 			g.uart2.send({pkt_sht40.raw(), pkt_sht40.size()});
 			g.uart2.send({stts2h_data.raw(), stts2h_data.size()});
 			g.uart1.send({pkt_sht40.raw(), pkt_sht40.size()});
@@ -312,14 +288,28 @@ extern "C" void DMA1_Stream7_IRQHandler(void)
 	getDrivers().i2c1.handleTxDmaInterrupt();
 }
 
+template <typename Driver> inline void handleTxDmaIfSupported(Driver &driver)
+{
+	if constexpr (Driver::kHasDma) {
+		driver.handleTxDmaInterrupt();
+	}
+}
+
+template <typename Driver> inline void handleRxDmaIfSupported(Driver &driver)
+{
+	if constexpr (Driver::kHasDma) {
+		driver.handleRxDmaInterrupt();
+	}
+}
+
 extern "C" void DMA1_Stream6_IRQHandler(void)
 {
-	// getDrivers().uart2.handleTxDmaInterrupt();
+	handleTxDmaIfSupported(getDrivers().uart2);
 }
 
 extern "C" void DMA1_Stream5_IRQHandler(void)
 {
-	// getDrivers().uart2.handleRxDmaInterrupt();
+	handleRxDmaIfSupported(getDrivers().uart2);
 }
 
 extern "C" void USART1_IRQHandler(void)

@@ -32,6 +32,8 @@ class DmaUart: public Stm32Uart
 	void handleTxDmaInterrupt();
 	void handleRxDmaInterrupt();
 
+	static constexpr bool kHasDma = true;
+
       protected:
 	// Interupt Handler
 	void onPostUartInit();

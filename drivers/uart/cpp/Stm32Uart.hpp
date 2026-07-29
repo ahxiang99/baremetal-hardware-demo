@@ -71,7 +71,8 @@ class Stm32Uart
 	bool send(std::span<const uint8_t> data);
 	bool receive(std::span<uint8_t> buf);
 	USART_TypeDef *rawInstance() const;
-	void disable();
+
+	static constexpr bool kHasDma = false;
 
       protected:
 	USART_TypeDef *uart_;
