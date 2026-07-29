@@ -35,9 +35,14 @@ class Logger
       public:
 	Logger() = delete; // No Constructor -> Logger to run as a Singleton.
 
-	static void Init(UartRef device)
+	static Result<> initialize(const UartRef &device)
 	{
 		get_uart_device() = device;
+		if (get_uart_device().rawInstance() != nullptr) {
+			return Ok();
+		} else {
+			return Fail(Err::NullInstance);
+		}
 	}
 
 	static void set_level(LogLevel level)
@@ -45,8 +50,7 @@ class Logger
 		get_current_level() = level;
 	}
 
-	template <typename... Args>
-	static void Log(LogLevel level, std::string_view format, Args &&...args)
+	template <typename... Args> static void Log(LogLevel level, std::string_view format, Args &&...args)
 	{
 		if (level < get_current_level()) {
 			return;
@@ -105,8 +109,7 @@ class Logger
 		print_transport(format.data());
 	}
 
-	template <typename T, typename... Args>
-	static void process_format(std::string_view format, T &&first, Args &&...rest)
+	template <typename T, typename... Args> static void process_format(std::string_view format, T &&first, Args &&...rest)
 	{
 		size_t placeholder = format.find("{}");
 		if (placeholder == std::string_view::npos) {

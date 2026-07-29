@@ -2,33 +2,43 @@
 
 #include "pch.hpp"
 
-MySysTick::MySysTick() : Instance(SysTickPtr) {}
-
-void MySysTick::init() {
-    // Construct 1ms heartbeat
-    Instance->LOAD = (getDrivers().sysclock.getSysClock().sysclk / 1000) - 1;  // Set reload register
-    Instance->VAL  = 0;                                                        // Clear current value register
-    Instance->CTRL = 0x07U;                                                    // Enable SysTick, use processor clock, no interrupt
-    My_NVIC_EnableIRQ(15);
+MySysTick::MySysTick() : Instance(SysTickPtr)
+{
 }
 
-MySysTick::~MySysTick() {
-    Instance->CTRL = 0x00U;  // Disable SysTick
+Result<> MySysTick::initialize() const
+{
+	// Construct 1ms heartbeat
+	Instance->LOAD = (getDrivers().sysclock.getSysClock().sysclk / 1000) - 1; // Set reload register
+	Instance->VAL = 0;                                                        // Clear current value register
+	Instance->CTRL = SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE; // Enable SysTick, use processor clock, no interrupt
+	My_NVIC_EnableIRQ(15);
+	return Ok();
 }
 
-uint32_t MySysTick::get_ticks() const {
-    return tickCount.load(std::memory_order_relaxed);
+MySysTick::~MySysTick()
+{
+	Instance->CTRL = 0x00U; // Disable SysTick
 }
 
-void MySysTick::tick() {
-    tickCount++;
+uint32_t MySysTick::get_ticks() const
+{
+	return tickCount.load(std::memory_order_relaxed);
 }
 
-void MySysTick::delay_ms(uint32_t ms) const {
-    uint32_t _start = tickCount.load(std::memory_order_relaxed);
-    while ((tickCount.load(std::memory_order_relaxed) - _start) < ms);
+void MySysTick::tick()
+{
+	++tickCount;
 }
 
-extern "C" void SysTick_Handler() {
-    getDrivers().my_systick.tick();
+void MySysTick::delay_ms(uint32_t ms) const
+{
+	const uint32_t start = tickCount.load(std::memory_order_relaxed);
+	while ((tickCount.load(std::memory_order_relaxed) - start) < ms)
+		;
+}
+
+extern "C" void SysTick_Handler()
+{
+	getDrivers().my_systick.tick();
 }
