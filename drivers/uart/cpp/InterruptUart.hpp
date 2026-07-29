@@ -24,7 +24,7 @@ class InterruptUart: public Stm32Uart
 	void onTxInterrupt();
 	void onRxInterrupt();
 
-	void recoverTx();
+	void recoverTx() const;
 
       private:
 	RingBuffer<uint8_t, BUFF_SIZE> TxBuffer;
