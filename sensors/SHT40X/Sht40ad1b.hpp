@@ -47,20 +47,20 @@ class Sht40ad1b
 	// Public API
 	bool initialize(Command cmd);
 
-	bool isBusy() const;
+	[[nodiscard]] bool isBusy() const;
 
 	bool read();
 
 	void ProcessData();
 
-	SensorData getValue() const;
+	[[nodiscard]] SensorData getValue() const;
 
-	SensorState getState() const;
+	[[nodiscard]] SensorState getState() const;
 
 	void onDataReceived();
 
 	// Fault reporting
-	Result<Unit, Err> getFaultStatus() const;
+	[[nodiscard]] Result<Unit, Err> getFaultStatus() const;
 	void clearFault();
 
       private:

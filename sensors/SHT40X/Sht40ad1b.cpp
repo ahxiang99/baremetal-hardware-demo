@@ -51,30 +51,26 @@ void Sht40ad1b::ProcessData()
 			}
 		}
 	} else if (m_State == SensorState::DATA_READY) {
-		uint16_t temp_value_raw = (raw_data[0] * 0x100U) + raw_data[1];
-		uint8_t temp_value_crc = raw_data[2];
-		uint16_t rh_value_raw = (raw_data[3] * 0x100U) + raw_data[4];
-		uint8_t rh_value_crc = raw_data[5];
+		const uint16_t temp_value_raw = (raw_data[0] * 0x100U) + raw_data[1];
+		const uint8_t temp_value_crc = raw_data[2];
+		const uint16_t rh_value_raw = (raw_data[3] * 0x100U) + raw_data[4];
+		const uint8_t rh_value_crc = raw_data[5];
 		if (crc_check(&raw_data[0], 2, temp_value_crc) != 0U) {
-			m_data.temperature =
-				-45.0f + (175.0f * (float_t)temp_value_raw / (float_t)0xFFFF);
+			m_data.temperature = -45.0f + (175.0f * static_cast<float_t>(temp_value_raw) / static_cast<float_t>(0xFFFF));
 		} else {
-			LOG_WARN("SHT40: temperature CRC mismatch (got {}, raw={})",
-				 (uint32_t)temp_value_crc, (uint32_t)temp_value_raw);
+			LOG_WARN("SHT40: temperature CRC mismatch (got {}, raw={})", static_cast<uint32_t>(temp_value_crc), static_cast<uint32_t>(temp_value_raw));
 			m_data.temperature = 0.0f;
 		}
 
 		if (crc_check(&raw_data[3], 2, rh_value_crc) != 0U) {
-			m_data.humidity =
-				-6.0f + (125.0f * (float_t)rh_value_raw / (float_t)0xFFFF);
+			m_data.humidity = -6.0f + (125.0f * static_cast<float_t>(rh_value_raw) / static_cast<float_t>(0xFFFF));
 			if (m_data.humidity < 0.0f) {
 				m_data.humidity = 0.0f;
 			} else if (m_data.humidity > 100.0f) {
 				m_data.humidity = 100;
 			}
 		} else {
-			LOG_WARN("SHT40: humidity CRC mismatch (got {}, raw={})",
-				 (uint32_t)rh_value_crc, (uint32_t)rh_value_raw);
+			LOG_WARN("SHT40: humidity CRC mismatch (got {}, raw={})", static_cast<uint32_t>(rh_value_crc), static_cast<uint32_t>(rh_value_raw));
 			m_data.humidity = 0.0f;
 		}
 		m_State = SensorState::IDLE;
@@ -107,8 +103,7 @@ void Sht40ad1b::noteFailure(Err err)
 	}
 	if (m_retryCount > kMaxRetries && m_lastError != err) {
 		m_lastError = err;
-		LOG_ERROR("SHT40: sensor fault after {} consecutive failures (err={})",
-			  (uint32_t)m_retryCount, (uint32_t)err);
+		LOG_ERROR("SHT40: sensor fault after {} consecutive failures (err={})", static_cast<uint32_t>(m_retryCount), static_cast<uint32_t>(err));
 	}
 }
 

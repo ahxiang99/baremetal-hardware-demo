@@ -26,10 +26,10 @@ Cli cmd;
 std::atomic_bool g_cmd_complete{true};
 std::atomic<AppMode> g_AppMode{AppMode::Console};
 
-/* Function Prototype */
-void register_fn_callback();
-void appModeOperation(Drivers &, uint32_t &);
-void oled_screen_update(Drivers &, uint32_t &);
+/* Function Declaration */
+static void register_fn_callback();
+static void appModeOperation(Drivers &, uint32_t &);
+static void oled_screen_update(Drivers &, uint32_t &);
 
 /* Main Program Start Here */
 int main()
@@ -61,7 +61,7 @@ int main()
 	uint32_t disp_start = g.my_systick.get_ticks();
 	uint32_t wwdg_refresh_start = g.my_systick.get_ticks();
 
-	while (1) {
+	while (true) {
 		const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
 
 		g.i2c1.processRx();
@@ -126,7 +126,7 @@ int main()
 
 		/* Command Queue */
 		if (g_cmd_complete.load(std::memory_order_acquire)) {
-			I2CCommand cmd;
+			I2CCommand cmd{};
 			if (cmd_queue.pop(cmd)) {
 				g_cmd_complete.store(false, std::memory_order_relaxed);
 				getDrivers().i2c1.complete_flag_ = &g_cmd_complete;
@@ -160,8 +160,7 @@ void register_fn_callback()
 void appModeOperation(Drivers &g, uint32_t &measure_start)
 {
 	/* Send data packet to PC via Uart2 */
-	const AppMode curMode = g_AppMode.load(std::memory_order_relaxed);
-	switch (curMode) {
+	switch (const AppMode curMode = g_AppMode.load(std::memory_order_relaxed)) {
 	case AppMode::Console: {
 		if (g.my_systick.get_ticks() - measure_start > 1000) {
 			LOG_INFO("SHT40: Temp: {} C, Rh: {}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
@@ -171,23 +170,31 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 		break;
 	}
 	case AppMode::SendPacket: {
-		static uint16_t seq = 0;
 		if (g.my_systick.get_ticks() - measure_start > 350) {
-			Env_Sensor_Data sht40_data{
+
+#define CONSOLE_APP 1
+#if CONSOLE_APP
+			const Packet<Sht40ad1b::SensorData, PacketType::PKT_SHT40> pkt_sht40_data{temp_sensor.getValue()};
+			g.uart2.send({pkt_sht40_data.raw(), pkt_sht40_data.size()});
+			const Packet<float_t, PacketType::PKT_STTS2H> pkt_stts2h_data{stts_temp.getTemp()};
+			g.uart2.send({pkt_stts2h_data.raw(), pkt_stts2h_data.size()});
+
+#else
+			static uint16_t seq = 0;
+			const Env_Sensor_Data sht40_data{
 				.last_rx_tick = static_cast<uint16_t>(g.my_systick.get_ticks() - measure_start),
 				.seq = seq++,
 				.temp_x100 = static_cast<int16_t>(temp_sensor.getValue().temperature * 100),
 				.rh_x100 = static_cast<int16_t>(temp_sensor.getValue().humidity * 100),
 			};
-			const Packet<Env_Sensor_Data, PacketType::VERSION_0> pkt_sht40{sht40_data};
-			const Packet<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
-			g.uart2.send({pkt_sht40.raw(), pkt_sht40.size()});
-			g.uart2.send({stts2h_data.raw(), stts2h_data.size()});
-			g.uart1.send({pkt_sht40.raw(), pkt_sht40.size()});
+			const Packet<Env_Sensor_Data, PacketType::PKT_ENV_SENSOR_DATA> pkt_sht40_data{sht40_data};
+			g.uart1.send({pkt_sht40_data.raw(), pkt_sht40_data.size()});
+#endif
 			measure_start = g.my_systick.get_ticks();
 		}
 		break;
 	}
+
 	case AppMode::CliMode: {
 		/* Command Line Interface Input Processing */
 		if (cmd.getState() == CliState::Completed) {
@@ -199,6 +206,7 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 			cmd.get_input();
 			cmd.setState(CliState::Processing);
 		}
+		break;
 	}
 	default:
 		break;
@@ -252,14 +260,14 @@ extern "C" void DMA1_Stream7_IRQHandler(void)
 	getDrivers().i2c1.handleTxDmaInterrupt();
 }
 
-template <typename Driver> inline void handleTxDmaIfSupported(Driver &driver)
+template <typename Driver> static inline void handleTxDmaIfSupported(Driver &driver)
 {
 	if constexpr (Driver::kHasDma) {
 		driver.handleTxDmaInterrupt();
 	}
 }
 
-template <typename Driver> inline void handleRxDmaIfSupported(Driver &driver)
+template <typename Driver> static inline void handleRxDmaIfSupported(Driver &driver)
 {
 	if constexpr (Driver::kHasDma) {
 		driver.handleRxDmaInterrupt();

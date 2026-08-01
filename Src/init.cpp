@@ -232,7 +232,7 @@ void logBootDiagnostics(uint32_t csr, uint32_t breadcrumb)
 }
 } // namespace
 
-void initDriver(Drivers &g)
+static void initDriver(Drivers &g)
 {
 	/* Snapshot reset-cause and last panic breadcrumb before anything clears them */
 	const uint32_t bootCsr = RCC->CSR;
@@ -247,6 +247,6 @@ void initDriver(Drivers &g)
 	initTimer(g);
 	initRtc(g);
 	initDisplay(g);
-	initWatchdog(g);
+	// initWatchdog(g);
 	LOG_INFO("Boot complete");
 }
