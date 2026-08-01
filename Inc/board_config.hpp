@@ -5,6 +5,7 @@
 #include "cpp/Stm32Timer.hpp"
 #include "cpp/Stm32Uart.hpp"
 #include "drivers.hpp"
+#include "pch.hpp"
 namespace board
 {
 inline constexpr SysClockConfig sys_cfg_84{SysClockSource::PLL,      {HSI_Freq_Hz, 8, 84, 2},

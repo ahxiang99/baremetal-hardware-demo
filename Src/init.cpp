@@ -10,12 +10,16 @@
 #include "cpp/InterruptI2C.hpp"
 
 #include <typeinfo>
+#include "AppMode.hpp"
+
+extern std::atomic<AppMode> g_AppMode;
 
 namespace
 {
 
 enum class BootTag : uint8_t {
 	Clock = 1,
+	Systick,
 	GpioMux,
 	Led,
 	Uart2,
@@ -27,13 +31,11 @@ enum class BootTag : uint8_t {
 	Oled
 };
 
-template <typename T1, typename T2, typename T3, typename T4>
-void init_device_has_dma(T1 &dev, T2 &&cfg, T3 &&tx_cfg, T4 &&rx_cfg, BootTag tag)
+template <typename T1, typename T2, typename T3, typename T4> void init_device_has_dma(T1 &dev, T2 &&cfg, T3 &&tx_cfg, T4 &&rx_cfg, BootTag tag)
 {
 	if constexpr (std::is_same_v<T1, DmaUart> || std::is_same_v<T1, DmaI2C>) {
 		checkOk(dev.initialize(cfg, tx_cfg, rx_cfg), tag);
-	} else if constexpr (std::is_same_v<T1, InterruptUart> ||
-			     std::is_same_v<T1, InterruptI2C>) {
+	} else if constexpr (std::is_same_v<T1, InterruptUart> || std::is_same_v<T1, InterruptI2C>) {
 		checkOk(dev.initialize(cfg), tag);
 	}
 }
@@ -110,34 +112,29 @@ void enableFpu()
 void initCore(Drivers &g)
 {
 	enableFpu();
-	g.sysclock.initialize(board::sys_cfg_84, board::clock_tree);
-	g.my_systick.init();
+	checkOk(g.sysclock.initialize(board::sys_cfg_84, board::clock_tree), BootTag::Clock);
+	checkOk(g.my_systick.initialize(), BootTag::Systick);
 
-	Logger::Init(UartRef::from(g.uart2));
+	Logger::initialize(UartRef::from(g.uart2));
 	Logger::set_level(LogLevel::INFO);
 	LOG_PRINT("\n");
-	LOG_INFO("AHB: {}, APB1: {}, APB2: {}", board::clock_tree.ahb, board::clock_tree.apb1,
-		 board::clock_tree.apb2);
+	LOG_INFO("AHB: {}, APB1: {}, APB2: {}", board::clock_tree.ahb, board::clock_tree.apb1, board::clock_tree.apb2);
 }
 
 void initComms(Drivers &g)
 {
-	init_device_has_dma(g.uart2, board::uart2::cfg, board::uart2::hdmatx_cfg,
-			    board::uart2::hdmarx_cfg, BootTag::Uart1);
+	init_device_has_dma(g.uart2, board::uart2::cfg, board::uart2::hdmatx_cfg, board::uart2::hdmarx_cfg, BootTag::Uart1);
 	LOG_INFO("UART2 up");
 
 	init_device_has_dma(g.uart1, board::uart1::cfg, nullptr, nullptr, BootTag::Uart1);
-	init_device_has_dma(g.i2c1, board::i2c1::cfg, board::i2c1::config_tx,
-			    board::i2c1::config_rx, BootTag::I2c1);
+	init_device_has_dma(g.i2c1, board::i2c1::cfg, board::i2c1::config_tx, board::i2c1::config_rx, BootTag::I2c1);
 	LOG_INFO("I2C1 up");
 }
 
 void initGpioMux()
 {
 	/* this is for peripherals gpio */
-	static constexpr const GPIO_Config *mux[] = {
-		&board::uart2::gpio_cfg, &board::uart1::gpio_cfg, &board::i2c1::gpio_cfg,
-		&board::spi1::gpio_cfg};
+	static constexpr const GPIO_Config *mux[] = {&board::uart2::gpio_cfg, &board::uart1::gpio_cfg, &board::i2c1::gpio_cfg, &board::spi1::gpio_cfg};
 	for (auto *cfg : mux) {
 		checkOk(Gpio::configureMux(*cfg), BootTag::GpioMux);
 	}
@@ -165,7 +162,7 @@ void initTimer(Drivers &g)
 void initExti(Drivers &g)
 {
 	/* GPIO C Pin 13 */
-	g.user_button.initialize(board::exti::pc13_gpio_cfg);
+	checkOk(g.user_button.initialize(board::exti::pc13_gpio_cfg, onButtonPress, &g_AppMode), BootTag::Exti);
 	LOG_INFO("PC13 (Button) EXTI Up");
 }
 

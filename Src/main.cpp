@@ -9,22 +9,14 @@
 #include "RingBuffer.hpp"
 #include "SensorPacket.hpp"
 #include "Sht40ad1b.hpp"
-#include "cpp/Dma.hpp"
 #include "cpp/ExtiInput.hpp"
-#include "cpp/Gpio.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/Stm32GpioPin.hpp"
-#include "cpp/Stm32I2C.hpp"
-#include "cpp/UartConcepts.hpp"
 #include "cpp/UartRef.hpp"
 #include "drivers.hpp"
 #include "init.hpp"
-#include "low-level/nvic.h"
-#include "low-level/rcc_bitfields.h"
-#include "low-level/syscfg_registers.h"
 #include "pch.hpp"
 #include "stts2h.hpp"
-#include "low-level/i2c_bitfields.h"
 
 // Global Variables
 Sht40ad1b temp_sensor(I2C_Ref::from(getDrivers().i2c1));
@@ -55,13 +47,8 @@ int main()
 	SpscRingBuffer<I2CCommand, 4> cmd_queue;
 
 	if constexpr (kOxiMeterEnable) {
-		Max30102::SensorConfig oxi_config{Max30102::FifoSampleAvg::AVG4,
-						  Max30102::FifoRollOver::ENABLE,
-						  0,
-						  Max30102::SensorMode::SpO2,
-						  Max30102::SpO2ADC::SCALE_4096,
-						  Max30102::SpO2SampleRate::RATE_100,
-						  Max30102::SpO2PulseWidth::ADC_18BITS};
+		Max30102::SensorConfig oxi_config{Max30102::FifoSampleAvg::AVG4,      Max30102::FifoRollOver::ENABLE,      0, Max30102::SensorMode::SpO2, Max30102::SpO2ADC::SCALE_4096,
+						  Max30102::SpO2SampleRate::RATE_100, Max30102::SpO2PulseWidth::ADC_18BITS};
 		oxiSensor.setConfig(oxi_config);
 
 		if (!oxiSensor.getInit()) {
@@ -98,12 +85,8 @@ int main()
 			g.timer.start(100);
 
 			if (curMode != AppMode::CliMode) {
-				cmd_queue.push(
-					{[](void *ctx) { static_cast<Sht40ad1b *>(ctx)->read(); },
-					 &temp_sensor});
-				cmd_queue.push(
-					{[](void *ctx) { static_cast<Stts2h *>(ctx)->read(); },
-					 &stts_temp});
+				cmd_queue.push({[](void *ctx) { static_cast<Sht40ad1b *>(ctx)->read(); }, &temp_sensor});
+				cmd_queue.push({[](void *ctx) { static_cast<Stts2h *>(ctx)->read(); }, &stts_temp});
 			}
 		}
 
@@ -115,18 +98,13 @@ int main()
 			/* Start Oximeter */
 			if constexpr (kOxiMeterEnable) {
 				oxiSensor.processData();
-				cmd_queue.push(
-					{[](void *ctx) { static_cast<Max30102 *>(ctx)->read(); },
-					 &oxiSensor});
+				cmd_queue.push({[](void *ctx) { static_cast<Max30102 *>(ctx)->read(); }, &oxiSensor});
 				char buf[128];
 				if (oxiSensor.isDataReady()) {
-					FloatIntExtraction SpO2_v =
-						convertInt(oxiSensor.getData().spo2);
+					FloatIntExtraction SpO2_v = convertInt(oxiSensor.getData().spo2);
 					snprintf(buf, sizeof(buf), "BPM and SpO2 Found.");
 					g.disp.Show(buf, 0, 0, 0);
-					snprintf(buf, sizeof(buf), "BPM: %d, SpO2: %d.%d",
-						 oxiSensor.getData().bpm, SpO2_v.Integer,
-						 SpO2_v.Decimal);
+					snprintf(buf, sizeof(buf), "BPM: %d, SpO2: %d.%d", oxiSensor.getData().bpm, SpO2_v.Integer, SpO2_v.Decimal);
 					g.disp.Show(buf, 0, 8, 1);
 					oxiSensor.clearDataReadyFlag();
 				}
@@ -167,11 +145,7 @@ int main()
 
 void register_fn_callback()
 {
-	getDrivers().uart2.onDataReceived(
-		[](void *ctx, const uint8_t *data, size_t len) {
-			static_cast<Cli *>(ctx)->onUartData(data, len);
-		},
-		&cmd);
+	getDrivers().uart2.onDataReceived([](void *ctx, const uint8_t *data, size_t len) { static_cast<Cli *>(ctx)->onUartData(data, len); }, &cmd);
 	cmd.setUart(UartRef::from(getDrivers().uart2));
 	cmd.setSensor(&temp_sensor);
 
@@ -181,8 +155,6 @@ void register_fn_callback()
 		getDrivers().i2c1.addReceiver(cmd);
 		getDrivers().i2c1.addReceiver(oxiSensor);
 	}
-
-	getDrivers().user_button.setFnCallback(onButtonPress, &g_AppMode);
 }
 
 void appModeOperation(Drivers &g, uint32_t &measure_start)
@@ -192,8 +164,7 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 	switch (curMode) {
 	case AppMode::Console: {
 		if (g.my_systick.get_ticks() - measure_start > 1000) {
-			LOG_INFO("SHT40: Temp: {} C, Rh: {}", temp_sensor.getValue().temperature,
-				 temp_sensor.getValue().humidity);
+			LOG_INFO("SHT40: Temp: {} C, Rh: {}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
 			LOG_INFO("STTS2H: Temp: {}", stts_temp.getTemp());
 			measure_start = g.my_systick.get_ticks();
 		}
@@ -203,17 +174,13 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 		static uint16_t seq = 0;
 		if (g.my_systick.get_ticks() - measure_start > 350) {
 			Env_Sensor_Data sht40_data{
-				.last_rx_tick = static_cast<uint16_t>(g.my_systick.get_ticks() -
-								      measure_start),
+				.last_rx_tick = static_cast<uint16_t>(g.my_systick.get_ticks() - measure_start),
 				.seq = seq++,
-				.temp_x100 = static_cast<int16_t>(
-					temp_sensor.getValue().temperature * 100),
-				.rh_x100 =
-					static_cast<int16_t>(temp_sensor.getValue().humidity * 100),
+				.temp_x100 = static_cast<int16_t>(temp_sensor.getValue().temperature * 100),
+				.rh_x100 = static_cast<int16_t>(temp_sensor.getValue().humidity * 100),
 			};
 			const Packet<Env_Sensor_Data, PacketType::VERSION_0> pkt_sht40{sht40_data};
-			const Packet<float_t, PacketType::VERSION_2> stts2h_data{
-				stts_temp.getTemp()};
+			const Packet<float_t, PacketType::VERSION_2> stts2h_data{stts_temp.getTemp()};
 			g.uart2.send({pkt_sht40.raw(), pkt_sht40.size()});
 			g.uart2.send({stts2h_data.raw(), stts2h_data.size()});
 			g.uart1.send({pkt_sht40.raw(), pkt_sht40.size()});
@@ -224,8 +191,7 @@ void appModeOperation(Drivers &g, uint32_t &measure_start)
 	case AppMode::CliMode: {
 		/* Command Line Interface Input Processing */
 		if (cmd.getState() == CliState::Completed) {
-			LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature,
-				 temp_sensor.getValue().humidity);
+			LOG_INFO("STH40: Temp:{}, Rh:{}", temp_sensor.getValue().temperature, temp_sensor.getValue().humidity);
 			cmd.setState(CliState::WaitingForInput);
 		}
 		g.uart2.processRx();
@@ -246,13 +212,11 @@ void oled_screen_update(Drivers &g, uint32_t &disp_start)
 	/* Update Time */
 	RTC_DateTypeDef d = g.rtc.getDate();
 	RTC_TimeTypeDef t = g.rtc.getTime();
-	snprintf(buf, sizeof(buf), "20%02d/%02d/%02d %02d:%02d:%02d", d.Year, d.Month, d.Day,
-		 t.Hours, t.Minutes, t.Seconds);
+	snprintf(buf, sizeof(buf), "20%02d/%02d/%02d %02d:%02d:%02d", d.Year, d.Month, d.Day, t.Hours, t.Minutes, t.Seconds);
 	g.disp.Show(buf, 0, 0, 0);
 
 	/* Update Mode */
-	snprintf(buf, sizeof(buf), "AppMode: %s",
-		 namingTable[static_cast<uint8_t>(g_AppMode.load(std::memory_order_relaxed))].name);
+	snprintf(buf, sizeof(buf), "AppMode: %s", namingTable[static_cast<uint8_t>(g_AppMode.load(std::memory_order_relaxed))].name);
 	g.disp.Show(buf, 0, 8, 1);
 
 	/* Update Sensor Value */
