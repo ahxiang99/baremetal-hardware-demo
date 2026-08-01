@@ -41,20 +41,20 @@ struct Result {
         return Result{Err{std::move(err)}};
     }
 
-    bool isOk() const {
+    [[nodiscard]] bool isOk() const {
         return std::holds_alternative<Ok>(data);
     }
 
     T& value() {
         return std::get<Ok>(data).v;
     }
-    const T& value() const {
+    [[nodiscard]] const T& value() const {
         return std::get<Ok>(data).v;
     }
     E& error() {
         return std::get<Err>(data).e;
     }
-    const E& error() const {
+    [[nodiscard]] const E& error() const {
         return std::get<Err>(data).e;
     }
 };
