@@ -1,3 +1,4 @@
 #pragma once
 
-void initDriver(Drivers &g);
+void initDriver(DriversList &g);
+void initSensor(SensorsList &g);

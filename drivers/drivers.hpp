@@ -1,6 +1,8 @@
 #pragma once
 
-#include "SSD1306/oled_SSD1306.hpp"
+#include "SHT40X.hpp"
+#include "STTS22H.hpp"
+#include "oled_disp.hpp"
 #include "cpp/DmaI2C.hpp"
 #include "cpp/ExtiInput.hpp"
 #include "cpp/InterruptUart.hpp"
@@ -12,24 +14,34 @@
 #include "rtc/cpp/Stm32RTC.hpp"
 
 template <typename T> struct peripherals_regs_table {
-	T *instance;
-	uint32_t enableBit;
-	uint32_t resetBit;
+    T *instance;
+    uint32_t enableBit;
+    uint32_t resetBit;
 };
 
-struct Drivers {
-	Stm32GpioPin gpio_led;
-	InterruptUart uart2;
-	DmaI2C i2c1;
-	Stm32Spi spi1;
-	MySysTick my_systick;
-	Stm32Rtc rtc;
-	Stm32Timer timer;
-	SysClock sysclock;
-	ExtiInput user_button;
-	OLED_Display disp;
-	InterruptUart uart1;
-	WindowWatchDog wwdg;
+struct DriversList {
+    Stm32GpioPin gpio_led;
+    InterruptUart uart2;
+    DmaI2C i2c1;
+    Stm32Spi spi1;
+    MySysTick my_systick;
+    Stm32Rtc rtc;
+    Stm32Timer timer;
+    SysClock sysclock;
+    ExtiInput user_button;
+    oled_disp disp;
+    InterruptUart uart1;
+    WindowWatchDog wwdg;
 };
 
-Drivers &getDrivers();
+struct SensorsList {
+    SHT40X SENSOR_SHT40X;
+    STTS22H SENSOR_STTS22H;
+    explicit SensorsList(const I2C_Ref &i2c) : SENSOR_SHT40X(i2c), SENSOR_STTS22H(i2c)
+    {
+    }
+};
+
+DriversList &getDrivers();
+
+SensorsList &getSensors();
