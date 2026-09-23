@@ -1,5 +1,6 @@
 build
 !.settings
+/.idea/
 *.pdf
 CLAUDE.md
 /.claude/
