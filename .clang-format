@@ -101,7 +101,7 @@ IncludeCategories:
     Priority: 3
 IndentCaseLabels: false
 IndentGotoLabels: false
-IndentWidth: 8
+IndentWidth: 4
 InsertBraces: true
 InsertNewlineAtEOF: true
 SpaceBeforeInheritanceColon: False
