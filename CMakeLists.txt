@@ -11,8 +11,8 @@
 # If no LICENSE file comes with this software, it is provided AS-IS.
 #
 # -----------------------------------------------------------------------------
- 
- cmake_minimum_required(VERSION 3.20)
+
+cmake_minimum_required(VERSION 3.20)
 
 #
 # This file is generated only once, and is not re-generated.
@@ -34,66 +34,73 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Core MCU flags, CPU type, instruction set and FPU setup
-set(cpu_PARAMS 
-    -mcpu=cortex-m4
-    -mthumb
-    -mfpu=fpv4-sp-d16
-    -mfloat-abi=hard    
-    # Other parameters
-    # -mthumb
-    # -mcpu, -mfloat, -mfloat-abi, ...
+set(cpu_PARAMS
+        -mcpu=cortex-m4
+        -mthumb
+        -mfpu=fpv4-sp-d16
+        -mfloat-abi=hard
+        # Other parameters
+        # -mthumb
+        # -mcpu, -mfloat, -mfloat-abi, ...
 )
 
 # Sources
 set(sources_SRCS
-	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/init.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/InterruptUart.cpp 
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp 
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/DmaI2C.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dma/cpp/Dma.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti/cpp/ExtiInput.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/middleware/SSD1306/oled_SSD1306.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Src/init.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/drivers.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio/cpp/Stm32Gpiopin.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/Stm32Uart.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/InterruptUart.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart/cpp/DmaUart.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/Stm32I2C.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/InterruptI2C.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c/cpp/DmaI2C.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/low-level/rcc.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer/cpp/Stm32Timer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dma/cpp/Dma.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick/cpp/systick.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti/cpp/ExtiInput.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi/cpp/Stm32Spi.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc/cpp/Stm32Rcc.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc/cpp/Stm32Rtc.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg/cpp/wwdg.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/middleware/SSD1306/SSD1306.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/middleware/oled_disp/oled_disp.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X/Sht40ad1b.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/startup_stm32f401xx.S
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X/SHT40X.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/Tachometer/Tachometer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/STTS22H/STTS22H.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Src/startup_stm32f401xx.S
 )
 
 # Include directories for all compilers
 set(include_DIRS
-	${CMAKE_CURRENT_SOURCE_DIR}/Inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dma
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/pwr
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
-    ${CMAKE_CURRENT_SOURCE_DIR}/middleware
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensors
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X
+        ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/exti
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/uart
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rcc
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dma
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/timer
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/systick
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/nvic
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/flash
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rtc
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/pwr
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/wwdg
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/CMSIS/Include
+        ${CMAKE_CURRENT_SOURCE_DIR}/middleware
+        ${CMAKE_CURRENT_SOURCE_DIR}/middleware/oled_disp
+        ${CMAKE_CURRENT_SOURCE_DIR}/middleware/SSD1306
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/SHT40X
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/STTS22H
+        ${CMAKE_CURRENT_SOURCE_DIR}/sensors/Tachometer
 )
 
 # Include directories for each compiler
@@ -140,22 +147,22 @@ target_sources(${CMAKE_PROJECT_NAME} PUBLIC ${sources_SRCS})
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    ${include_DIRS}
-    $<$<COMPILE_LANGUAGE:C>: ${include_c_DIRS}>
-    $<$<COMPILE_LANGUAGE:CXX>: ${include_cxx_DIRS}>
-    $<$<COMPILE_LANGUAGE:ASM>: ${include_asm_DIRS}>
+        ${include_DIRS}
+        $<$<COMPILE_LANGUAGE:C>: ${include_c_DIRS}>
+        $<$<COMPILE_LANGUAGE:CXX>: ${include_cxx_DIRS}>
+        $<$<COMPILE_LANGUAGE:ASM>: ${include_asm_DIRS}>
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    ${symbols_SYMB}
-    $<$<COMPILE_LANGUAGE:C>: ${symbols_c_SYMB}>
-    $<$<COMPILE_LANGUAGE:CXX>: ${symbols_cxx_SYMB}>
-    $<$<COMPILE_LANGUAGE:ASM>: ${symbols_asm_SYMB}>
+        ${symbols_SYMB}
+        $<$<COMPILE_LANGUAGE:C>: ${symbols_c_SYMB}>
+        $<$<COMPILE_LANGUAGE:CXX>: ${symbols_cxx_SYMB}>
+        $<$<COMPILE_LANGUAGE:ASM>: ${symbols_asm_SYMB}>
 
-    # Config-specific optimization and debug info
-    $<$<CONFIG:Debug>:DEBUG>
-    $<$<CONFIG:Release>:NDEBUG>
+        # Config-specific optimization and debug info
+        $<$<CONFIG:Debug>:DEBUG>
+        $<$<CONFIG:Release>:NDEBUG>
 )
 
 # Add linked libraries
@@ -163,24 +170,24 @@ target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS})
 
 # Compiler options
 target_compile_options(${PROJECT_NAME} PRIVATE
-    -mcpu=cortex-m4
-    -mthumb
-    -mfloat-abi=hard
-    -mfpu=fpv4-sp-d16
-    -ffunction-sections
-    -fdata-sections
-    $<$<CONFIG:Debug>:-O0 -g3>
-    $<$<CONFIG:Release>:-Os -g0>
+        -mcpu=cortex-m4
+        -mthumb
+        -mfloat-abi=hard
+        -mfpu=fpv4-sp-d16
+        -ffunction-sections
+        -fdata-sections
+        $<$<CONFIG:Debug>:-O0 -g3>
+        $<$<CONFIG:Release>:-Os -g0>
 )
 
 target_link_options(${PROJECT_NAME} PRIVATE
-    -mcpu=cortex-m4
-    -mthumb
-    -mfloat-abi=hard
-    -mfpu=fpv4-sp-d16
-    -Wl,--gc-sections
-    -Wl,--print-memory-usage
-    --specs=nosys.specs
+        -mcpu=cortex-m4
+        -mthumb
+        -mfloat-abi=hard
+        -mfpu=fpv4-sp-d16
+        -Wl,--gc-sections
+        -Wl,--print-memory-usage
+        --specs=nosys.specs
 )
 
 # Set linker script as a dependency to force re-link if it changes
@@ -188,11 +195,11 @@ set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_DEPENDS ${linker_scr
 
 # Execute post-build to print size, generate hex and bin
 add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.hex
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.bin
-    # Strip debug symbols from ELF in Release only
-    COMMAND $<$<CONFIG:Release>:${CMAKE_STRIP}> $<$<CONFIG:Release>:--strip-debug> $<$<CONFIG:Release>:$<TARGET_FILE:${CMAKE_PROJECT_NAME}>>
+        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.hex
+        COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.bin
+        # Strip debug symbols from ELF in Release only
+        COMMAND $<$<CONFIG:Release>:${CMAKE_STRIP}> $<$<CONFIG:Release>:--strip-debug> $<$<CONFIG:Release>:$<TARGET_FILE:${CMAKE_PROJECT_NAME}>>
 )
 
 
