@@ -8,9 +8,7 @@
 #include "pch.hpp"
 namespace board
 {
-inline constexpr SysClockConfig sys_cfg_84{SysClockSource::PLL,      {HSI_Freq_Hz, 8, 84, 2},
-					   AHB_ClockDivision::DIV_1, APB_ClockDivision::DIV_2,
-					   APB_ClockDivision::DIV_1, 3};
+inline constexpr SysClockConfig sys_cfg_84{SysClockSource::PLL, {HSI_Freq_Hz, 8, 84, 2}, AHB_ClockDivision::DIV_1, APB_ClockDivision::DIV_2, APB_ClockDivision::DIV_1, 3};
 
 static_assert(isValidPllConfig(sys_cfg_84.PllCfg), "PLL config invalid");
 inline constexpr ClockTree clock_tree = calcClockTree_v2(sys_cfg_84);
@@ -30,11 +28,8 @@ inline constexpr GPIO_Config gpio_cfg{.pin = GPIO_PIN_2 | GPIO_PIN_3,
 				      .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
 				      .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
 				      .afr = GPIO_AFR::GPIO_AF7_USART1_2};
-inline constexpr UartConfig cfg{.dev_num = UartDevice_t::USART_D2,
-				.baudRate = UartBaudRate_t::BR_9600,
-				.comm = UartComm_t::RX_TX,
-				.parity = UartParity_t::NONE,
-				.stopbits = UartStopBit_t::USART_CR2_STOP_1};
+inline constexpr UartConfig cfg{
+	.dev_num = UartDevice_t::USART_D2, .baudRate = UartBaudRate_t::BR_9600, .comm = UartComm_t::RX_TX, .parity = UartParity_t::NONE, .stopbits = UartStopBit_t::USART_CR2_STOP_1};
 
 /* This DMA Config is for USART2 Tx */
 inline constexpr DMA_Config hdmatx_cfg{.Peripheral = DMA_Peripheral::USART2_TX,
@@ -65,11 +60,8 @@ inline constexpr GPIO_Config gpio_cfg{.pin = GPIO_PIN_9 | GPIO_PIN_10,
 				      .pupdr = GPIO_PUPDR::GPIO_PUPDR_NOPULL,
 				      .afr = GPIO_AFR::GPIO_AF7_USART1_2};
 
-inline constexpr UartConfig cfg{.dev_num = UartDevice_t::USART_D1,
-				.baudRate = UartBaudRate_t::BR_460800,
-				.comm = UartComm_t::RX_TX,
-				.parity = UartParity_t::NONE,
-				.stopbits = UartStopBit_t::USART_CR2_STOP_1};
+inline constexpr UartConfig cfg{
+	.dev_num = UartDevice_t::USART_D1, .baudRate = UartBaudRate_t::BR_460800, .comm = UartComm_t::RX_TX, .parity = UartParity_t::NONE, .stopbits = UartStopBit_t::USART_CR2_STOP_1};
 
 } // namespace uart1
 
@@ -165,5 +157,30 @@ inline constexpr TimerConfig cfg{.Instance = TimerDevice_t::TIMER_3,
 				 .ClockDivision = TimerClockDivision_t::TIM_CLOCKDIVISION_DIV1,
 				 .AutoReloadPreload = TimerARR_t::ENABLE};
 }
+
+namespace oled_scr
+{
+inline constexpr GPIO_Config RST_CFG{.pin = GPIO_PIN_13,
+				     .port = GPIO_Port::GPIO_PB,
+				     .mode = GPIO_Moder::GPIO_MODE_OUTPUT,
+				     .otype = GPIO_OType::GPIO_OTYPER_PP,
+				     .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+				     .pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP,
+				     .afr = GPIO_AFR::GPIO_AF0_SYSTEM};
+inline constexpr GPIO_Config DC_CFG{.pin = GPIO_PIN_14,
+				    .port = GPIO_Port::GPIO_PB,
+				    .mode = GPIO_Moder::GPIO_MODE_OUTPUT,
+				    .otype = GPIO_OType::GPIO_OTYPER_PP,
+				    .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+				    .pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP,
+				    .afr = GPIO_AFR::GPIO_AF0_SYSTEM};
+inline constexpr GPIO_Config CS_CFG{.pin = GPIO_PIN_15,
+				    .port = GPIO_Port::GPIO_PB,
+				    .mode = GPIO_Moder::GPIO_MODE_OUTPUT,
+				    .otype = GPIO_OType::GPIO_OTYPER_PP,
+				    .ospdr = GPIO_OSPDR::GPIO_OSPEEDR_VHS,
+				    .pupdr = GPIO_PUPDR::GPIO_PUPDR_PULLUP,
+				    .afr = GPIO_AFR::GPIO_AF0_SYSTEM};
+} // namespace oled_scr
 
 } // namespace board
