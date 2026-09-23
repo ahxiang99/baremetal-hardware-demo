@@ -1,5 +1,5 @@
 #pragma once
-#include "Sht40ad1b.hpp"
+#include "SHT40X.hpp"
 #include <array>
 #include <cstdint>
 #include <iomanip>
@@ -48,7 +48,7 @@ struct __attribute__((packed)) Env_Sensor_Data {
 };
 
 struct SensorPacketV1 {
-	Sht40ad1b::SensorData m_data;
+	SHT40X::SensorData m_data;
 
 	static std::string header()
 	{

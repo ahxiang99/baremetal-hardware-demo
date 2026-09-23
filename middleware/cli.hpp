@@ -9,7 +9,7 @@
 #include <memory>
 
 #include "RingBuffer.hpp"
-#include "Sht40ad1b.hpp"
+#include "SHT40X.hpp"
 #include "cpp/DmaI2C.hpp"
 #include "cpp/II2C.hpp"
 #include "cpp/InterruptI2C.hpp"
@@ -52,7 +52,7 @@ class Cli
 		uart_ = uart;
 	}
 
-	void setSensor(Sht40ad1b *sensor)
+	void setSensor(SHT40X *sensor)
 	{
 		sensor_ = sensor;
 	}
@@ -138,7 +138,7 @@ class Cli
 
       private:
 	UartRef uart_;
-	Sht40ad1b *sensor_ = nullptr;
+	SHT40X *sensor_ = nullptr;
 	RingBuffer<uint8_t, 1024> lineBuffer;
 	CliState state_ = CliState::WaitingForInput;
 	std::array<cmd, 4> cmd_table;
